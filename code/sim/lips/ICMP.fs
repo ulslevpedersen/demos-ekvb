@@ -1,18 +1,12 @@
 ﻿// Copyright: 2017-, Copenhagen Business School
 // Author: Rasmus Ulslev Pedersen (rp.digi@cbs.dk)
-
 // License: Simplified BSD License
-//
 // LIPS: ICMP message
 
 namespace lips
 
 [<AutoOpen>]
 module ICMP =
-    let prn (str : string) = 
-            System.Console.WriteLine(str)
-            System.Diagnostics.Debug.WriteLine(str)
-
     type ICMPMessage() as __ =
         let mutable header : byte[] = Array.zeroCreate 8 // 8 bytes header
         let icmptype_mask = 0xFF
