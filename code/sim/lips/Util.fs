@@ -10,21 +10,23 @@ module Util =
     let prn (str : string) = 
             System.Console.WriteLine(str)
             System.Diagnostics.Debug.WriteLine(str)
-
-    let hex2ascii hx =
+    
+    // I.e.: 0xB -> 'B'
+    let hex2ascii (hx:int) =
         match hx with
         | _ when hx <= 0x9 -> char (hx + 48)
         | _ when hx >= 0xA && hx <= 0xF -> char (hx + 55)
         | _ -> failwith "unexpected input"
 
-    let char2byte ch =
+    // I.e.: 'C' -> 0xC
+    let char2byte (ch:char) =
         match ch with
         | _ when ch >= '0' && ch <= '9' -> byte (int ch - 48)
         | _ when ch >= 'A' && ch <= 'F' -> byte (int ch - 55)
         | _ -> failwith "unexpected input"
     
     // example: 0xCA becomes "CA"
-    let byte2str by =
+    let byte2str (by:int) =
         let highby = by >>> 4
         let lowby = by &&& 0x0F
         string (hex2ascii highby) + string (hex2ascii lowby)
@@ -34,14 +36,20 @@ module Util =
         let highby = char2byte (char str.[0])
         let lowby = char2byte (char str.[1])
         highby <<< 4 ||| lowby
-
-    let str2bytes (str:string) =
+    
+    // "CAFEBABE" -> [|0xCA;0xFE;0xBA;0xBE|] (of half the length)
+    let str2bytearray (str:string) =
         let mutable ba : byte[] = Array.zeroCreate 0 //TODO: odd 
         for i in 0 ..2.. str.Length-1 do
             let by = strtwo2byte (str.Substring(i,2))
             ba <- Array.append ba [|by|]
         ba
-            
 
-        
-        
+    // [|0xCA;0xFE;0xBA;0xBE|] -> "CAFEBABE" (twice the length)
+    let bytearray2str (bytes:byte[]) =
+        let strarray = Array.zeroCreate<string> (bytes.Length * 2)
+        for i in 0 .. bytes.Length do
+            let strtwo = byte2str(int bytes.[i])
+            strarray.[i*2] <- string(strtwo.[0])
+            strarray.[i*2 + 1] <- string(strtwo.[1])
+        string(strarray)

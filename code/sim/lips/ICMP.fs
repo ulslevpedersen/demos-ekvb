@@ -3,6 +3,18 @@
 // License: Simplified BSD License
 // LIPS: ICMP message
 
+//RFC 792
+//Echo or Echo Reply Message
+//    0                   1                   2                   3
+//    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   |     Type      |     Code      |          Checksum             |
+//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   |           Identifier          |        Sequence Number        |
+//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   |     Data ...
+//   +-+-+-+-+-
+
 namespace lips
 
 [<AutoOpen>]
@@ -24,29 +36,41 @@ module ICMP =
         let mutable id       = 0x0001 // client process id, pid, default 0x0001
         let seqno_mask = 0xFFFF
         let mutable seqno    = 0x0000 // starting at 0 and incremented for each echo request
-        let mutable data : byte [] = Array.zeroCreate 0 
-        do __.UpdateHeader()
-        member __.Header with get() = header and
+        let mutable data : byte [] = Array.zeroCreate 0
+        
+        static member ICMPECHOREQUEST with get() = 8
+        static member ICMPECHOREPLY   with get() = 0
+
+        member __.Header with get()      = header and
                               set(value) = header <- value
-                                           __.UpdateHeader()
-        member __.Icmptype with get() = icmptype and
+                                           // word 0: icmp type, code, checksum
+                                           icmptype <- int header.[0]
+                                           code     <- int header.[1]
+                                           chksum   <- ((int header.[2] <<< 8) &&& 0xFF00) ||| (int header.[3] &&& 0x00FF)
+                                           // word 1: identifier, sequence number 
+                                           id       <- ((int header.[4] <<< 8) &&& 0xFF00) ||| (int header.[5] &&& 0x00FF)
+                                           seqno    <- ((int header.[6] <<< 8) &&& 0xFF00) ||| (int header.[7] &&& 0x00FF)
+        member __.Icmptype with get()      = icmptype and
                                 set(value) = icmptype <- value
-                                             __.UpdateHeader()
-        member __.Code with get() = code and
+                                             header.[0] <- byte icmptype
+        member __.Code with get()      = code and
                             set(value) = code <- value
-                                         __.UpdateHeader()
-        member __.Chksum with get() = chksum and
+                                         header.[1] <- byte code
+        member __.Chksum with get()      = chksum and
                               set(value) = chksum <- value
-                                           __.UpdateHeader()
-        member __.Id with get() = id and
+                                           header.[2] <- byte(chksum >>> 8)
+                                           header.[3] <- byte chksum
+        member __.Id with get()      = id and
                           set(value) = id <- value
-                                       __.UpdateHeader()
-        member __.Seqno with get() = seqno and
+                                       header.[4] <- byte(id >>> 8)
+                                       header.[5] <- byte id                                       
+        member __.Seqno with get()      = seqno and
                              set(value) = seqno <- value
-                                          __.UpdateHeader()
-        member __.Data with get() = data and
+                                          header.[6] <- byte(seqno >>> 8)
+                                          header.[7] <- byte seqno
+        member __.Data with get()      = data and
                             set(value) = data <- value
-                                         __.UpdateHeader()
+
         member __.Print() =
             prn (sprintf "ICMPPacket.Icmptype:0x%02X" __.Icmptype)
             prn (sprintf "ICMPPacket.Code:0x%02X" __.Code)
@@ -56,31 +80,13 @@ module ICMP =
             __.Header |> Array.iteri (fun i l -> prn (sprintf "Header[%02d]=0x%02X" i l))
             __.Data |> Array.iteri (fun i l -> prn(sprintf "Data[%02d]=0x%02X" i l))
 
-        member __.UpdateHeader() =
-            // word 0: icmp type, code, checksum
-            header.[0]  <- byte (icmptype &&& icmptype_mask) 
-            header.[1]  <- byte (code &&& code_mask)
-            header.[2]  <- byte ((chksum &&& chksum_mask) >>> 8)
-            header.[3]  <- byte (chksum &&& chksum_mask)
-            // word 1: identifier, sequence number 
-            header.[4]  <- byte ((id &&& id_mask) >>> 8)
-            header.[5]  <- byte (id &&& id_mask)
-            header.[6]  <- byte ((seqno &&& seqno_mask) >>> 8)
-            header.[7]  <- byte (seqno &&& seqno_mask)
-            // data
-            __.CalculateChecksum()
-
-        member __.CalculateChecksum() =
+        member __.CalculateChecksum(_header:byte[], _data:byte[]) =
             let mutable checksum = 0
-            checksum <- checksum + int header.[0] <<< 8 + int header.[1]
-            checksum <- checksum + int header.[4] <<< 8 + int header.[5]
-            checksum <- checksum + int header.[6] <<< 8 + int header.[7]
-            // include data in the ICMP checksum
-            __.Data |> Array.iteri (fun i l -> checksum <- checksum + int l)
+            _header |> Array.iteri (fun i l -> checksum <- checksum + int l)
+            _data |> Array.iteri (fun i l -> checksum <- checksum + int l)
             if (checksum &&& 0xFFFF0000 > 0) then // sign problem?
-                 checksum <- checksum >>> 16 + (checksum &&& 0x0000FFFF)
+                 checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
             if (checksum &&& 0xFFFF0000 > 0) then
-                 checksum <- checksum >>> 16 + (checksum &&& 0x0000FFFF)
+                 checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
             checksum <- ~~~checksum
-            header.[2]  <- byte ((checksum &&& chksum_mask) >>> 8)
-            header.[3]  <- byte (checksum &&& chksum_mask)
+            checksum

@@ -7,7 +7,7 @@ namespace lips
 [<AutoOpen>]
 module IP =
     open System
-
+    /// LIPS IPPacket
     type IPPacket() as __ =
         let ver_mask     = 0b1111
         let hdr_mask     = 0b1111
@@ -59,7 +59,34 @@ module IP =
             __.DstIP   <- 0x01020305 // dafault remote 1.2.3.5
             __.Data    <- Array.zeroCreate 0 // can be actual testing data 
             __.Tlen    <- 20 // total length in bytes
-            __.Hchksum <- __.CalculateChecksum(__.Header, true)
+            //__.Hchksum <- __.CalculateChecksum(__.Header)
+
+        static member ICMPPROTOCOL with get() = 1 // .Prot
+
+        member __.Header with get()      = header and
+                              set(value) = header <- value
+                                           ver    <- (int header.[0] &&& ver_mask) <<< 4
+                                           hdr    <- int header.[0] &&& hdr_mask 
+                                           tos    <- int header.[1] &&& tos_mask
+                                           tlen   <- (int header.[2] <<< 8 
+                                                      ||| int header.[3]) &&& tlen_mask
+                                           id     <- (int header.[4] <<< 8 
+                                                      ||| int header.[5]) &&& id_mask
+                                           flags  <- (int header.[6] >>> 5) &&& flags_mask
+                                           foff   <- (((int header.[6] &&& 0b11111) <<< 8) 
+                                                        ||| int header.[7]) &&& foff_mask
+                                           ttl    <- int header.[7] &&& ttl_mask
+                                           prot   <- int header.[8] &&& prot_mask
+                                           hchksum<- ((int header.[10] <<< 8) &&& int header.[1]) 
+                                                       &&& hchksum 
+                                           srcip  <- (int header.[12] <<< 24) |||
+                                                     (int header.[13] <<< 16) |||
+                                                     (int header.[14] <<< 8)  |||
+                                                      int header.[15] 
+                                           dstip  <- (int header.[16] <<< 24) |||
+                                                     (int header.[17] <<< 16) |||
+                                                     (int header.[18] <<< 8)  |||
+                                                      int header.[19] 
 
         /// Version 4-bits .[0H]
         member __.Ver with get()      = ver and
@@ -131,30 +158,6 @@ module IP =
                                           header.[17] <- byte ((dstip &&& dstip_mask) >>> 16)
                                           header.[18] <- byte ((dstip &&& dstip_mask) >>> 8)
                                           header.[19] <- byte (dstip &&& dstip_mask)
-        member __.Header with get()      = header and
-                              set(value) = header <- value
-                                           ver    <- (int header.[0] &&& ver_mask) <<< 4
-                                           hdr    <- int header.[0] &&& hdr_mask 
-                                           tos    <- int header.[1] &&& tos_mask
-                                           tlen   <- (int header.[2] <<< 8 
-                                                      ||| int header.[3]) &&& tlen_mask
-                                           id     <- (int header.[4] <<< 8 
-                                                      ||| int header.[5]) &&& id_mask
-                                           flags  <- (int header.[6] >>> 5) &&& flags_mask
-                                           foff   <- (((int header.[6] &&& 0b11111) <<< 8) 
-                                                        ||| int header.[7]) &&& foff_mask
-                                           ttl    <- int header.[7] &&& ttl_mask
-                                           prot   <- int header.[8] &&& prot_mask
-                                           hchksum<- ((int header.[10] <<< 8) &&& int header.[1]) 
-                                                       &&& hchksum 
-                                           srcip  <- (int header.[12] <<< 24) |||
-                                                     (int header.[13] <<< 16) |||
-                                                     (int header.[14] <<< 8)  |||
-                                                      int header.[15] 
-                                           dstip  <- (int header.[16] <<< 24) |||
-                                                     (int header.[17] <<< 16) |||
-                                                     (int header.[18] <<< 8)  |||
-                                                      int header.[19] 
 
         /// Data, byte array, such an an ICMP message
         /// Manually update TLen and Hchksum
@@ -166,16 +169,10 @@ module IP =
         member __.UpdateTlen() =
             tlen <- hdr * 4 + data.Length
 
-        /// Update Hchksum
-        /// Use after updating any header field, but usually Data
-        member __.UpdateHchksum() =
-            __.Hchksum <- __.CalculateChecksum(header, true) 
-                          &&& hchksum_mask
-      
         /// Header checksum
         /// If zero then zero out the checksum fields in .[10] and .[11]
         /// Zero is false when verifying a checksum and true when calculating a new one
-        member __.CalculateChecksum(_hdr:byte[], zero:bool) : int =
+        member __.CalculateChecksum (_hdr:byte[]) =
             // Test: 4500 0073 0000 4000 4011 *b861* c0a8 0001 c0a8 00c7
             let mutable checksum = 0
             checksum <- checksum + (int _hdr.[0] <<< 8) + int _hdr.[1]
@@ -183,8 +180,7 @@ module IP =
             checksum <- checksum + (int _hdr.[4] <<< 8) + int _hdr.[5]
             checksum <- checksum + (int _hdr.[6] <<< 8) + int _hdr.[7]
             checksum <- checksum + (int _hdr.[8] <<< 8) + int _hdr.[9]
-            if (not zero) then
-                checksum <- checksum + (int _hdr.[10] <<< 8) + int _hdr.[11]
+            // skip header.[10] and header.[11]
             checksum <- checksum + (int _hdr.[12] <<< 8) + int _hdr.[13]
             checksum <- checksum + (int _hdr.[14] <<< 8) + int _hdr.[15]
             checksum <- checksum + (int _hdr.[16] <<< 8) + int _hdr.[17]
@@ -192,9 +188,9 @@ module IP =
             if (checksum &&& 0xFFFF0000 > 0) then // sign problem?
                 checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
             if (checksum &&& 0xFFFF0000 > 0) then
-                checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
-            checksum <- ~~~checksum &&& hchksum_mask
-            checksum
+                checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF) //TODO: enough?
+            checksum <- ~~~checksum 
+            checksum &&& hchksum_mask
 
         member __.Print() =
             // word 0: version, header length, total length
