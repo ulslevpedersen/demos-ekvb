@@ -35,7 +35,7 @@ module ICMP =
             // Checksum later
             __.Seqno    <- 0x0000
             __.Data     <- [|byte 0xAC; byte 0xDC|]
-            __.Chksum   <- __.CalculateChecksum(__.Header, __.Data)
+            __.Chksum   <- __.CalculateChecksum()
         
         static member ICMPECHOREQUEST with get() = 8
         static member ICMPECHOREPLY   with get() = 0
@@ -67,12 +67,12 @@ module ICMP =
             __.Header |> Array.iteri (fun i l -> prn (sprintf "Header[%02d]=0x%02X" i l))
             __.Data |> Array.iteri (fun i l -> prn(sprintf "Data[%02d]=  0x%02X" i l))
 
-        member __.CalculateChecksum(_header:byte[], _data:byte[]) =
-            let mutable checksum = ((int _header.[0] <<< 8) ||| (int _header.[1]))
-            checksum <- checksum + ((int _header.[4] <<< 8) ||| (int _header.[5]))
-            checksum <- checksum + ((int _header.[6] <<< 8) ||| (int _header.[7]))
-            for i in 0 .. 2 .. _data.Length - 1 do
-                checksum <- checksum + ((int _data.[i] <<< 8) ||| (int _data.[i+1]))
+        member __.CalculateChecksum() =
+            let mutable checksum = ((int header.[0] <<< 8) ||| (int header.[1]))
+            checksum <- checksum + ((int header.[4] <<< 8) ||| (int header.[5]))
+            checksum <- checksum + ((int header.[6] <<< 8) ||| (int header.[7]))
+            for i in 0 .. 2 .. data.Length - 1 do
+                checksum <- checksum + ((int data.[i] <<< 8) ||| (int data.[i+1]))
             if (checksum &&& 0xFFFF0000 > 0) then 
                  checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
             if (checksum &&& 0xFFFF0000 > 0) then
