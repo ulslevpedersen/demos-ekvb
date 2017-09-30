@@ -1,22 +1,25 @@
 ﻿// Copyright: 2017-, Copenhagen Business School
 // Author: Rasmus Ulslev Pedersen (rp.digi@cbs.dk)
 // License: Simplified BSD License
-// LIPS: Little IP Stack testing program
+// LIPS: Server
 
 namespace lips
 module MainModule = 
 
     open System
     open System.Net
-    open System.Text
     open System.IO
- 
+    open System.Text
+    open LIPSLIB.Util
+    open LIPSLIB.BH
+    open LIPSLIB.ICMP
+    open LIPSLIB.IP
+
     // ngrok http -subdomain=pingrt -host-header=localhost 8080
     let siteRoot = @"C:\Users\ulslevpedersen\Desktop\www"
     let host = "http://localhost:8080/"
  
     // GET
-
     let myCallbacker (reader:IO.StreamReader option) url = 
         if reader.IsSome then 
             let html = reader.Value.ReadToEnd()
@@ -35,7 +38,7 @@ module MainModule =
          callback (Some reader) url
       with 
       | :? System.Net.WebException as ex -> 
-          //printfn "%s" ex.Message
+          printfn "Web error, no answer from: %s (%s)" url ex.Message
           callback None url
 
   // return all the html
@@ -114,8 +117,7 @@ module MainModule =
                 newip.Data <- Array.concat [icmpreply.Header; icmpreply.Data]
                 newip.Hchksum <- newip.CalculateChecksum(newip.Header)
                 res <- Some newip
-        res
-
+        res    
     [<EntryPoint>]
     let main argv = 
 
@@ -164,7 +166,8 @@ module MainModule =
             let icmpmsg = ICMPMessage()
             icmpmsg.Data <- [|byte 0xCA; byte 0xFE; byte 0xBA; byte 0xBE; byte 0x00; byte i|]
             icmpmsg.Chksum <- icmpmsg.CalculateChecksum(icmpmsg.Header, icmpmsg.Data)
-            //icmpmsg.Print()
+            prn "ICMP:->"
+            icmpmsg.Print()
             // IP packet
             let ippacket = IPPacket()
             // Test
@@ -175,22 +178,21 @@ module MainModule =
             //ippacket.SrcIP <- 0xC0A80001
             //ippacket.DstIP <- 0xC0A800C7
             //ippacket.UpdateHchksum() // 0xB861
-            ippacket.Print()
             // Insert ICMP rtequest in IP
             ippacket.Data <- Array.concat [icmpmsg.Header; icmpmsg.Data]
-            ippacket.UpdateTlen()
-            ippacket.Hchksum <- ippacket.CalculateChecksum(ippacket.Header)
+            prn "IP:->"
             ippacket.Print()
             // Issue GET to ms
             let iptxt = Array.concat [ippacket.Header;ippacket.Data] |>
                         Array.map (fun b -> byte2str(int b)) 
-            blaaurl1 <- "http://pingrt.ngrok.io/" + String.Join("", iptxt)
+            //blaaurl1 <- "http://pingrt.ngrok.io/" + String.Join("", iptxt)
             blaaurl2 <- "http://dbaa8026.ngrok.io/" + String.Join("", iptxt)
-            let blaahund1 = fetchUrl myCallbacker blaaurl1
+            //let blaahund1 = fetchUrl myCallbacker blaaurl1
             let blaahund2 = fetchUrl myCallbacker blaaurl2
             prn (sprintf "Sendt packet no. %d" i)
             i <- i + 1
             System.Threading.Thread.Sleep 5000
 
+        let e = IPPacket.ICMPPROTOCOL
         System.Console.ReadKey() |> ignore
-        0
+        0 // return an integer exit code

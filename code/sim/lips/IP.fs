@@ -3,14 +3,31 @@
 // License: Simplified BSD License
 // LIPS: IP packet
 
-namespace lips
+//RFC 791:  Internet Header Format
+//   0                   1                   2                   3
+//   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//  |Version|  IHL  |Type of Service|          Total Length         |
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//  |         Identification        |Flags|      Fragment Offset    |
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//  |  Time to Live |    Protocol   |         Header Checksum       |
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//  |                       Source Address                          |
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//  |                    Destination Address                        |
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//  |                    Options                    |    Padding    |
+//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+namespace LIPSLIB
 [<AutoOpen>]
 module IP =
     open System
     /// LIPS IPPacket
     type IPPacket() as __ =
-        let ver_mask     = 0b1111
-        let hdr_mask     = 0b1111
+        let ver_mask     = 0b1111_0000
+        let hdr_mask     = 0b0000_1111
         let tos_mask     = 0b1111_1111
         let tlen_mask    = 0xFFFF
         let id_mask      = 0xFFFF
@@ -23,25 +40,6 @@ module IP =
         let dstip_mask   = 0xFFFFFFFF
         
         let mutable header : byte[] = Array.zeroCreate 20 // 20 bytes header
-        let mutable ver     = 0 // version
-        let mutable hdr     = 0 // num of 32-bit words
-        let mutable tos     = 0 // type of service
-        let mutable tlen    = 0 // total length in bytes
-        let mutable id      = 0 // identification
-        let mutable flags   = 0 // fragment flags
-        let mutable foff    = 0 // flags offset
-        let mutable ttl     = 0 // time to live
-        let mutable prot    = 0 // ICMP = 1
-        let mutable hchksum = 0 // sum the 9 16-bit words, keeping hchksum 0, 
-                                // keep adding (and nulling) 
-                                // the top 16 bits in the sum word to the lower 16 
-                                // bits, until there is 
-                                // no carry, then get the 1-complement (~). 
-                                // Verifying: Add all the 16-bit 
-                                // words and then the carry(s) and take the 
-                                // compliment, verify it is 0000.
-        let mutable srcip   = 0  // default local 
-        let mutable dstip   = 0  // dafault remote
         let mutable data : byte array = Array.zeroCreate 0 
 
         do
@@ -52,126 +50,83 @@ module IP =
             __.Id      <-  0 // identification
             __.Flags   <-  0 // fragment flags, 0
             __.Foff    <-  0 // flags offset, 0
-            __.Ttl     <-  1 // time to live, 1
+            __.Ttl     <- 10 // time to live, 1
             __.Prot    <-  1 // ICMP = 1
             // Hchksum, later
             __.SrcIP   <- 0x01020304 // default local 1.2.3.4
             __.DstIP   <- 0x01020305 // dafault remote 1.2.3.5
             __.Data    <- Array.zeroCreate 0 // can be actual testing data 
             __.Tlen    <- 20 // total length in bytes
-            //__.Hchksum <- __.CalculateChecksum(__.Header)
-
-        static member ICMPPROTOCOL with get() = 1 // .Prot
-
+            __.Hchksum <- __.CalculateChecksum(__.Header)
+        static member ICMPPROTOCOL  = 1 // .Prot
         member __.Header with get()      = header and
                               set(value) = header <- value
-                                           ver    <- (int header.[0] &&& ver_mask) <<< 4
-                                           hdr    <- int header.[0] &&& hdr_mask 
-                                           tos    <- int header.[1] &&& tos_mask
-                                           tlen   <- (int header.[2] <<< 8 
-                                                      ||| int header.[3]) &&& tlen_mask
-                                           id     <- (int header.[4] <<< 8 
-                                                      ||| int header.[5]) &&& id_mask
-                                           flags  <- (int header.[6] >>> 5) &&& flags_mask
-                                           foff   <- (((int header.[6] &&& 0b11111) <<< 8) 
-                                                        ||| int header.[7]) &&& foff_mask
-                                           ttl    <- int header.[7] &&& ttl_mask
-                                           prot   <- int header.[8] &&& prot_mask
-                                           hchksum<- ((int header.[10] <<< 8) &&& int header.[1]) 
-                                                       &&& hchksum 
-                                           srcip  <- (int header.[12] <<< 24) |||
-                                                     (int header.[13] <<< 16) |||
-                                                     (int header.[14] <<< 8)  |||
-                                                      int header.[15] 
-                                           dstip  <- (int header.[16] <<< 24) |||
-                                                     (int header.[17] <<< 16) |||
-                                                     (int header.[18] <<< 8)  |||
-                                                      int header.[19] 
-
-        /// Version 4-bits .[0H]
-        member __.Ver with get()      = ver and
-                           set(value) = ver <- value
-                                        header.[0] <- byte (((ver &&& ver_mask) <<< 4) 
-                                                           ||| (hdr &&& hdr_mask)) 
-        /// Header 4-bits .[0L], number of 32-bit words
-        member __.Hdr with get ()     = hdr and
-                           set(value) = hdr <- value
-                                        header.[0] <- byte (((ver &&& ver_mask) <<< 4) 
-                                                           ||| (hdr &&& hdr_mask)) 
+        /// Version 4-bits .[V0]
+        member __.Ver with get()      = int (header.[0] >>> 4) and
+                           set(value) = header.[0] <- byte (value <<< 4) 
+                                                      ||| byte (int header.[0] &&& hdr_mask)
+        /// Header 4-bits .[0H], number of 32-bit words
+        member __.Hdr with get ()     = int header.[0] &&& hdr_mask and
+                           set(value) = header.[0] <- byte (int header.[0] &&& ver_mask) 
+                                                      ||| byte (value &&& hdr_mask) 
         /// Type of service 8-bits .[1]
-        member __.Tos with get ()     = tos and
-                           set(value) = tos <- value
-                                        header.[1] <- byte (tos &&& tos_mask)
+        member __.Tos with get ()     = int header.[1] and
+                           set(value) = header.[1] <- byte value
         /// Total length in byte, 16-bits .[2] .[3]         
-        member __.Tlen with get ()     = tlen and
-                            set(value) = tlen <- value
-                                         header.[2] <- byte ((tlen &&& tlen_mask) >>> 8)
-                                         header.[3] <- byte (tlen &&& tlen_mask)
+        member __.Tlen with get ()     = (int header.[2] <<< 8) ||| int header.[3] and
+                            set(value) = header.[2] <- byte (value >>> 8) 
+                                         header.[3] <- byte value
         /// Identification, 16-bits, .[4] .[5]
-        member __.Id with get ()     = id and
-                          set(value) = id <- value
-                                       header.[4] <- byte ((id &&& id_mask) >>> 8)
-                                       header.[5] <- byte (id &&& id_mask)      
+        member __.Id with get ()     = (int header.[4] <<< 8) ||| int header.[5] and
+                          set(value) = header.[4] <- byte (value >>> 8)
+                                       header.[5] <- byte value      
         /// Flags, 3-bits, .[6H]
-        member __.Flags with get ()     = flags and
-                             set(value) = flags <- value
-                                          header.[6] <- byte (((flags &&& flags_mask) <<< 5) 
+        member __.Flags with get ()     = int header.[6] >>> 5 and
+                             set(value) = header.[6] <- byte (((value &&& flags_mask) <<< 5) 
                                                         ||| (int header.[6] &&& 0b11111))              
         /// Fragment offset, 13-bits, .[6L] .[7]
-        member __.Foff with get ()     = foff and
-                            set(value) = foff <- value
-                                         header.[6] <- byte ((int header.[6] &&& 0b11100000) 
-                                                       ||| ((foff &&& foff_mask) >>> 8))
-                                         header.[7] <- byte (foff &&& foff_mask)
+        member __.Foff with get ()     = ((int header.[6] &&& 0b11111) <<< 8) ||| int header.[7] and
+                            set(value) = header.[6] <- byte (int header.[6] &&& 0b11100000) ||| byte (value >>> 8)
+                                         header.[7] <- byte value
         /// Time to live, 8-bits, .[8]
-        member __.Ttl with get ()     = ttl and
-                           set(value) = ttl <- value
-                                        header.[8] <- byte (ttl &&& ttl_mask)
+        member __.Ttl with get ()     = int header.[8] and
+                           set(value) = header.[8] <- byte value
         /// Protocol, 8-bits, .[9]
-        member __.Prot with get ()     = prot and
-                            set(value) = prot <- value
-                                         header.[9] <- byte (prot &&& prot_mask)
+        member __.Prot with get ()     = int header.[9] and
+                            set(value) = header.[9] <- byte value
         /// Checksum, 16-bits, .[10] .[11]
-        /// Sum the 9 16-bit words, keeping hchksum 0, 
-        /// keep adding (and nulling) 
-        /// the top 16 bits in the sum word to the lower 16 
-        /// bits, until there is 
-        /// no carry, then get the 1-complement (~). 
-        /// Verifying: Add all the 16-bit 
-        /// words and then the carry(s) and take the 
-        /// compliment, verify it is 0000.
-        member __.Hchksum with get ()     = hchksum and
-                               set(value) = hchksum <- value
-                                            header.[10] <- byte ((hchksum &&& hchksum_mask) >>> 8)
-                                            header.[11] <- byte (hchksum &&& hchksum_mask)
+        member __.Hchksum with get ()     = (int header.[10] <<< 8) ||| (int header.[11]) and
+                               set(value) = header.[10] <- byte (value >>> 8)
+                                            header.[11] <- byte value
         /// Source IP, 32-bits, .[12] .[13] .[14] .[15]
-        member __.SrcIP with get ()     = srcip and
-                             set(value) = srcip <- value
-                                          header.[12] <- byte ((srcip &&& srcip_mask) >>> 24)
-                                          header.[13] <- byte ((srcip &&& srcip_mask) >>> 16)
-                                          header.[14] <- byte ((srcip &&& srcip_mask) >>> 8)
-                                          header.[15] <- byte (srcip &&& srcip_mask)
+        member __.SrcIP with get ()     = (int header.[12] <<< 24) ||| (int header.[13] <<< 16) |||
+                                          (int header.[14] <<<  8) ||| (int header.[15]) and
+                             set(value) = header.[12] <- byte (value >>> 24) // check the shift
+                                          header.[13] <- byte (value >>> 16)
+                                          header.[14] <- byte (value >>> 8)
+                                          header.[15] <- byte value 
         /// Destination IP, 32-bits, .[16] .[17] .[18] .[19] 
-        member __.DstIP with get ()     = dstip and
-                             set(value) = dstip <- value
-                                          header.[16] <- byte ((dstip &&& dstip_mask) >>> 24)
-                                          header.[17] <- byte ((dstip &&& dstip_mask) >>> 16)
-                                          header.[18] <- byte ((dstip &&& dstip_mask) >>> 8)
-                                          header.[19] <- byte (dstip &&& dstip_mask)
-
+        member __.DstIP with get ()     = (int header.[16] <<< 24) ||| (int header.[17] <<< 16) |||
+                                          (int header.[18] <<<  8) ||| (int header.[19]) and
+                             set(value) = header.[16] <- byte (value >>> 24)
+                                          header.[17] <- byte (value >>> 16)
+                                          header.[18] <- byte (value >>> 8)
+                                          header.[19] <- byte value
         /// Data, byte array, such an an ICMP message
         /// Manually update TLen and Hchksum
         member __.Data with get ()     = data and
                             set(value) = data <- value
-        
-        /// Update Tlen
+                                         //__.UpdateTlen()
+                                         //__.Hchksum <- __.CalculateChecksum(__.Header)
+        /// Calculate Tlen
         /// Use after updating payload Data
-        member __.UpdateTlen() =
-            tlen <- hdr * 4 + data.Length
-
+        member __.CalculateTlen() =
+            __.Header.Length + __.Data.Length
         /// Header checksum
-        /// If zero then zero out the checksum fields in .[10] and .[11]
-        /// Zero is false when verifying a checksum and true when calculating a new one
+        /// Sum the 9 16-bit words, keeping hchksum 0, keep adding (and nulling) 
+        /// the top 16 bits in the sum word to the lower 16 bits, until there is 
+        /// no carry, then get the 1-complement (~). Verifying: Add all the 16-bit 
+        /// words and then the carry(s) and take the compliment, verify it is 0000.
         member __.CalculateChecksum (_hdr:byte[]) =
             // Test: 4500 0073 0000 4000 4011 *b861* c0a8 0001 c0a8 00c7
             let mutable checksum = 0
@@ -191,7 +146,6 @@ module IP =
                 checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF) //TODO: enough?
             checksum <- ~~~checksum 
             checksum &&& hchksum_mask
-
         member __.Print() =
             // word 0: version, header length, total length
             // word 1: identification, fragment flags, fragment offset 
@@ -221,6 +175,5 @@ module IP =
             prn (sprintf "IPPacket.SrcIP:  0x%08X,      Header[12,13,14,15]=0x%02X 0x%02X 0x%02X 0x%02X"
                           __.SrcIP header.[12] header.[13] header.[14] header.[15])
             prn (sprintf "IPPacket.DestIP: 0x%08X,      Header[16,17,18,19]=0x%02X 0x%02X 0x%02X 0x%02X"
-                         __.DstIP header.[12] header.[13] header.[14] header.[15])
-            //__.Header |> Array.iteri (fun i l -> prn (sprintf "Header[%02d]=0x%02X" i l))
+                         __.DstIP header.[16] header.[17] header.[18] header.[19])
             __.Data   |> Array.iteri (fun i l -> prn(sprintf  "Data[%02d]  =0x%02X" i l))

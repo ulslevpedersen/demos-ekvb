@@ -3,7 +3,7 @@
 // License: Simplified BSD License
 // LIPS: Blaa Hund packet
 
-namespace lips
+namespace LIPSLIB
 
 [<AutoOpen>]
 module BH =
@@ -20,6 +20,5 @@ module BH =
         // Verifying that it contains only hex digits
         static member VerifyBHStr(newdata:string) :bool =
             let mutable res = true
-            newdata.ToCharArray() |> Array.iteri (fun i c -> if not <| Uri.IsHexDigit(c) then 
-                                                                 res <- false)
+            newdata.ToCharArray() |> Array.iteri (fun i c -> if not <| Uri.IsHexDigit(c) then res <- false)
             res

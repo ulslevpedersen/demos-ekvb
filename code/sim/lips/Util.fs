@@ -3,9 +3,11 @@
 // License: Simplified BSD License
 // LIPS: Utilities to work with network data
 
-namespace lips
+namespace LIPSLIB
 [<AutoOpen>]
 module Util =
+    open System
+
     // Example: 'prn (sprintf "%d" 123)'
     let prn (str : string) = 
             System.Console.WriteLine(str)
@@ -16,14 +18,15 @@ module Util =
         match hx with
         | _ when hx <= 0x9 -> char (hx + 48)
         | _ when hx >= 0xA && hx <= 0xF -> char (hx + 55)
-        | _ -> failwith "unexpected input"
+        | _ -> failwith "unexpected input" 
 
     // I.e.: 'C' -> 0xC
     let char2byte (ch:char) =
         match ch with
         | _ when ch >= '0' && ch <= '9' -> byte (int ch - 48)
+        | _ when ch >= 'a' && ch <= 'f' -> byte (int ch - 87)
         | _ when ch >= 'A' && ch <= 'F' -> byte (int ch - 55)
-        | _ -> failwith "unexpected input"
+        | _ -> failwith (sprintf "unexpected input: '%c'" ch)
     
     // example: 0xCA becomes "CA"
     let byte2str (by:int) =
@@ -48,8 +51,8 @@ module Util =
     // [|0xCA;0xFE;0xBA;0xBE|] -> "CAFEBABE" (twice the length)
     let bytearray2str (bytes:byte[]) =
         let strarray = Array.zeroCreate<string> (bytes.Length * 2)
-        for i in 0 .. bytes.Length do
+        for i in 0 .. bytes.Length-1 do
             let strtwo = byte2str(int bytes.[i])
             strarray.[i*2] <- string(strtwo.[0])
             strarray.[i*2 + 1] <- string(strtwo.[1])
-        string(strarray)
+        String.Join ("", strarray)
