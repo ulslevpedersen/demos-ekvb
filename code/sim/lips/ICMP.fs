@@ -34,7 +34,7 @@ module ICMP =
             __.Id       <- 0x0001
             // Checksum later
             __.Seqno    <- 0x0000
-            __.Data     <- [|byte 0xAC; byte 0xDC|]
+            __.Data     <- [|byte 0xAC|] //[|byte 0xAC; byte 0xDC|]
             __.Chksum   <- __.CalculateChecksum()
         
         static member ICMPECHOREQUEST with get() = 8
@@ -59,23 +59,49 @@ module ICMP =
                             set(value) = data <- value
 
         member __.Print() =
-            prn (sprintf "ICMPPacket.Icmptype:0x%02X" __.Icmptype)
-            prn (sprintf "ICMPPacket.Code:    0x%02X" __.Code)
-            prn (sprintf "ICMPPacket.Chksum:0x%04X" __.Chksum)
-            prn (sprintf "ICMPPacket.Id:    0x%04X" __.Id)
-            prn (sprintf "IPPacket.Seqno:   0x%04X" __.Seqno)
-            __.Header |> Array.iteri (fun i l -> prn (sprintf "Header[%02d]=0x%02X" i l))
-            __.Data |> Array.iteri (fun i l -> prn(sprintf "Data[%02d]=  0x%02X" i l))
+            prn (sprintf "ICMPPacket.Icmptype: 0x%02X            Header[0]:   0x%02X" __.Icmptype __.Header.[0])
+            prn (sprintf "ICMPPacket.Code:     0x%02X            Header[1]:   0x%02X" __.Code __.Header.[1])
+            prn (sprintf "ICMPPacket.Chksum:   0x%04X          Header[2,3]: 0x%02X 0x%02X" __.Chksum __.Header.[2] __.Header.[3])
+            prn (sprintf "ICMPPacket.Id:       0x%04X          Header[4,5]: 0x%02X 0x%02X" __.Id __.Header.[4] __.Header.[5])
+            prn (sprintf "ICMPPacket.Seqno:    0x%04X          Header[6,7]: 0x%02X 0x%02X" __.Seqno __.Header.[6] __.Header.[7])
+            //__.Header |> Array.iteri (fun i l -> prn (sprintf "Header[%02d]=0x%02X" i l))
+            for i in 0 .. data.Length - 1 do
+                if i % 4 = 0 then
+                    pr (sprintf "ICMPPacket.Data[%02d]: " i)
+                pr (sprintf "0x%02X " data.[i])
+                if (i + 1) % 4 = 0 then 
+                    prn ""
 
         member __.CalculateChecksum() =
             let mutable checksum = ((int header.[0] <<< 8) ||| (int header.[1]))
             checksum <- checksum + ((int header.[4] <<< 8) ||| (int header.[5]))
             checksum <- checksum + ((int header.[6] <<< 8) ||| (int header.[7]))
-            for i in 0 .. 2 .. data.Length - 1 do
-                checksum <- checksum + ((int data.[i] <<< 8) ||| (int data.[i+1]))
+            if data.Length = 1 then
+                checksum <- checksum + (int data.[0] <<< 8) // Padding with a "zero"
+            else
+                for i in 0 .. 2 .. data.Length - 2 do // there will be one or two bytes left
+                    checksum <- checksum + ((int data.[i] <<< 8) ||| (int data.[i+1]))
+                if data.Length % 2 = 0 then // two bytes left
+                    checksum <- checksum + ((int data.[data.Length - 2] <<< 8) ||| (int data.[data.Length - 1]))
+                else // one byte left
+                    checksum <- checksum + (int data.[data.Length - 1] <<< 8) // Padding with "zero"
             if (checksum &&& 0xFFFF0000 > 0) then 
                  checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
             if (checksum &&& 0xFFFF0000 > 0) then
                  checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
             checksum <- ~~~checksum
             checksum &&& 0x0000FFFF
+
+        member __.CreateICMPEchoReply(icmprequest:ICMPMessage) =
+               let icmpreply = new ICMPMessage()
+               icmpreply.Header <- Array.copy icmprequest.Header
+               icmpreply.Data <- Array.copy icmprequest.Data
+               icmpreply.Icmptype <- ICMPMessage.ICMPECHOREPLY
+               icmpreply.Chksum <- icmpreply.CalculateChecksum()
+               icmpreply
+
+        member __.IsICMPEchoRequest() =
+            __.Icmptype = ICMPMessage.ICMPECHOREQUEST
+
+        member __.IsICMPEchoReply() =
+            __.Icmptype = ICMPMessage.ICMPECHOREPLY

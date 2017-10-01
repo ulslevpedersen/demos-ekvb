@@ -166,28 +166,44 @@ module IP =
             // word 2: time to live, protocol, header checksum
             // word 3: source address
             // word 4: destination address
-            prn (sprintf "IPPacket.Ver:    0x%X,             Header[0 ]         =0x%02X" 
-                          __.Ver header.[0])
-            prn (sprintf "IPPacket.Hdr:    0x%X,             Header[ 0]         =0x%02X" 
-                          __.Hdr header.[0])
-            prn (sprintf "IPPacket.Tos:    0x%02X,            Header[1]          =0x%02X" 
+            prn (sprintf "IPPacket.Ver:        0x%X             Header[0 ]:          0x%02X (<- 4-bit)" 
+                          __.Ver (header.[0] &&& byte 0xF0))
+            prn (sprintf "IPPacket.Hdr:        0x%X             Header[ 0]:          0x%02X (4-bit ->)" 
+                          __.Hdr (header.[0] &&& byte 0x0F))
+            prn (sprintf "IPPacket.Tos:        0x%02X            Header[1]:           0x%02X" 
                           __.Tos header.[1])
-            prn (sprintf "IPPacket.Tlen:   0x%04X,          Header[2,3]        =0x%02X 0x%02X" 
+            prn (sprintf "IPPacket.Tlen:       0x%04X          Header[2,3]:         0x%02X 0x%02X" 
                           __.Tlen header.[2] header.[3])
-            prn (sprintf "IPPacket.Id:     0x%04X,          Header[4,5]        =0x%02X 0x%02X" 
+            prn (sprintf "IPPacket.Id:         0x%04X          Header[4,5]:         0x%02X 0x%02X" 
                           __.Id header.[4] header.[5])
-            prn (sprintf "IPPacket.Flags:  0b%s,           Header[6]          =0x%02X"
+            prn (sprintf "IPPacket.Flags:      0b%s           Header[6]:           0x%02X"
                           (Convert.ToString(__.Flags,2).PadLeft(3, '0')) header.[6])
-            prn (sprintf "IPPacket.Offset: 0b%s, Header[6,7]        =0x%02X 0x%02X" 
+            prn (sprintf "IPPacket.Offset:     0b%s Header[6,7]:         0x%02X 0x%02X" 
                           (Convert.ToString(__.Foff,2).PadLeft(13, '0')) (header.[6] &&& byte 0b11111) header.[7])
-            prn (sprintf "IPPacket.Ttl:    0x%02X,            Header[8]          =0x%02X" 
+            prn (sprintf "IPPacket.Ttl:        0x%02X            Header[8]:           0x%02X" 
                           __.Ttl header.[8])
-            prn (sprintf "IPPacket.Prot:   0x%02X,            Header[09]         =0x%02X" 
+            prn (sprintf "IPPacket.Prot:       0x%02X            Header[09]:          0x%02X" 
                           __.Prot header.[9])
-            prn (sprintf "IPPacket.Hchksum:0x%04X,          Header[10,11]      =0x%02X 0x%02X" 
+            prn (sprintf "IPPacket.Hchksum:    0x%04X          Header[10,11]:       0x%02X 0x%02X" 
                           __.Hchksum header.[10] header.[11])
-            prn (sprintf "IPPacket.SrcIP:  0x%08X,      Header[12,13,14,15]=0x%02X 0x%02X 0x%02X 0x%02X"
+            prn (sprintf "IPPacket.SrcIP:      0x%08X      Header[12,13,14,15]: 0x%02X 0x%02X 0x%02X 0x%02X"
                           __.SrcIP header.[12] header.[13] header.[14] header.[15])
-            prn (sprintf "IPPacket.DestIP: 0x%08X,      Header[16,17,18,19]=0x%02X 0x%02X 0x%02X 0x%02X"
+            prn (sprintf "IPPacket.DestIP:     0x%08X      Header[16,17,18,19]: 0x%02X 0x%02X 0x%02X 0x%02X"
                          __.DstIP header.[16] header.[17] header.[18] header.[19])
-            __.Data   |> Array.iteri (fun i l -> prn(sprintf  "Data[%02d]  =0x%02X" i l))
+            for i in 0 .. data.Length - 1 do
+                if i % 4 = 0 then
+                    pr (sprintf "IPPacket.Data[%02d]:   " i)
+                pr (sprintf  "0x%02X " data.[i])
+                if (i + 1) % 4 = 0 then prn ""
+
+            //__.Data   |> Array.iteri (fun i l -> prn(sprintf  "Data[%02d]: 0x%02X" i l))
+
+        member __.IsICMP() =
+            __.Prot = IPPacket.ICMPPROTOCOL
+
+        member __.SwitchSrcDstIP() =
+            let srcip = __.SrcIP
+            let dstip = __.DstIP
+            __.SrcIP <- dstip
+            __.DstIP <- srcip   
+            ()

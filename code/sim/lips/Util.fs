@@ -10,8 +10,12 @@ module Util =
 
     // Example: 'prn (sprintf "%d" 123)'
     let prn (str : string) = 
-            System.Console.WriteLine(str)
-            System.Diagnostics.Debug.WriteLine(str)
+        System.Console.WriteLine(str)
+        System.Diagnostics.Debug.WriteLine(str)
+
+    let pr (str : string) =
+        System.Console.Write(str)
+        System.Diagnostics.Debug.Write(str)
     
     // I.e.: 0xB -> 'B'
     let hex2ascii (hx:int) =
@@ -42,9 +46,12 @@ module Util =
     
     // "CAFEBABE" -> [|0xCA;0xFE;0xBA;0xBE|] (of half the length)
     let str2bytearray (str:string) =
+        let mutable evenstr = str
+        if str.Length % 2 <> 0 then
+            evenstr <- "0" + evenstr
         let mutable ba : byte[] = Array.zeroCreate 0 //TODO: odd 
-        for i in 0 ..2.. str.Length-1 do
-            let by = strtwo2byte (str.Substring(i,2))
+        for i in 0 ..2.. evenstr.Length-1 do
+            let by = strtwo2byte (evenstr.Substring(i,2))
             ba <- Array.append ba [|by|]
         ba
 
