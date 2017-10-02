@@ -4,7 +4,7 @@
 // LIPS: Client
 
 // Client: "1.2.3.4"
-// localhost:8084
+// localhost:8080
 
 namespace lips
 module MainModule = 
@@ -17,12 +17,12 @@ module MainModule =
 
     // LOCAL CLIENT/HOST
     // ngrok http -subdomain=pingrt -host-header=localhost 8080
-    let localaddr = "http://localhost:8084/"
+    let localaddr = "http://localhost:8080/"
     
     // REMOTE SERVER
-    //let blaaurl = "http://pingrt.ngrok.io/"
-    //let blaaurl = "http://dbaa8026.ngrok.io/"
-    let remoteaddr = "http://localhost:8085/"
+    //let remoteaddr = "http://pingrt.ngrok.io/"
+    let remoteaddr = "http://dbaa8026.ngrok.io/"
+    //let remoteaddr = "http://localhost:8085/"
  
     [<EntryPoint>]
     let main argv = 
@@ -30,7 +30,7 @@ module MainModule =
         startlisterner (localaddr, remoteaddr)
         // Issue PINGs toward the server
         let mutable i = 0
-        while i < 1 do // true do
+        while true do
             // ICMP echo request
             let icmpmsg = ICMPMessage()
             icmpmsg.Seqno <- i
@@ -50,7 +50,7 @@ module MainModule =
             ippacket.Data    <- Array.concat [icmpmsg.Header; icmpmsg.Data]
             ippacket.Tlen    <- ippacket.CalculateTlen()
             ippacket.Hchksum <- ippacket.CalculateChecksum()
-            prn "New IP/ICMP to be sent to remote server:"
+            prn (sprintf "(%d) New IP/ICMP to be sent to remote server:" i)
             ippacket.Print()
             icmpmsg.Print()
             // Issue GET to server
