@@ -4,7 +4,7 @@
 // LIPS: Client
 
 // Client: "1.2.3.4"
-// localhost:8080
+// Server: "1.2.3.5"
 
 namespace lips
 module MainModule = 
@@ -15,18 +15,21 @@ module MainModule =
     open LIPSLIB.IP
     open LIPSLIB.HTTPUTIL
 
-    // LOCAL CLIENT/HOST
+    // LOCAL CLIENT (LIPSClient)
     // ngrok http -subdomain=pingrt -host-header=localhost 8080
+    // let localaddr = "http://localhost:8084/"
     let localaddr = "http://localhost:8080/"
     
-    // REMOTE SERVER
+    // REMOTE SERVER (LIPSServer when testing on localhost)
+    // let remoteaddr = "http://localhost:8080/"
     //let remoteaddr = "http://pingrt.ngrok.io/"
-    let remoteaddr = "http://dbaa8026.ngrok.io/"
-    //let remoteaddr = "http://localhost:8085/"
+    let remoteaddr = "http://87cbaa5a.ngrok.io/"
+    
  
     [<EntryPoint>]
     let main argv = 
-        // Listen for server responses
+        Async.Start (startFetcher())
+        // Listen for server new packets / responses
         startlisterner (localaddr, remoteaddr)
         // Issue PINGs toward the server
         let mutable i = 0
@@ -55,8 +58,12 @@ module MainModule =
             icmpmsg.Print()
             // Issue GET to server
             let iptxt = bytearray2str(Array.concat [ippacket.Header;ippacket.Data])
-            prn "Done sending request"
-            let blaahund = Async.RunSynchronously (fetchUrl (remoteaddr + iptxt))
+            
+            //let blaahund = Async.RunSynchronously (fetchUrlAsync (remoteaddr + iptxt))
+            if txQueue.Put(remoteaddr + iptxt) then
+                prn (sprintf "TX queued new ICMP request %d" i)
+            else
+                prn (sprintf "Could not queue new ICMP request %d" i)
             i <- i + 1
             System.Threading.Thread.Sleep 5000
 

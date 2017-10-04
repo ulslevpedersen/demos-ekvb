@@ -7,6 +7,7 @@ namespace LIPSLIB
 [<AutoOpen>]
 module Util =
     open System
+    open System.Threading
 
     // Example: 'prn (sprintf "%d" 123)'
     let prn (str : string) = 
@@ -63,3 +64,20 @@ module Util =
             strarray.[i*2] <- string(strtwo.[0])
             strarray.[i*2 + 1] <- string(strtwo.[1])
         String.Join ("", strarray)
+
+    // https://msdn.microsoft.com/en-us/library/system.threading.readerwriterlock(v=vs.110).aspx?cs-save-lang=1&cs-lang=fsharp#code-snippet-1
+    let readLock (rwlock : ReaderWriterLock) f  =
+        rwlock.AcquireReaderLock(Timeout.Infinite)
+        try
+            f()
+        finally
+            rwlock.ReleaseReaderLock()
+ 
+    let writeLock (rwlock : ReaderWriterLock) f  =
+        rwlock.AcquireWriterLock(Timeout.Infinite)
+        try 
+            Thread.MemoryBarrier()
+            f()
+            //Thread.MemoryBarrier() //TODO
+        finally
+            rwlock.ReleaseWriterLock()

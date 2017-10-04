@@ -6,29 +6,44 @@
 namespace LIPSLIB
 
 [<AutoOpen>]
-module QueueModule = 
-    type Queue(cap:int) as __ =
-        let capacity = cap
-        let mutable free = cap
-        let mutable enqptr = 0
-        let mutable deqptr = 0
-        let data : byte[][] = [| for a in 0 .. cap - 1  do yield [||] |]
+module QueueModule =
+    open System.Threading
 
-        // Read if not empty
-        member __.Dequeue() : byte[] option=
-            let mutable res = None
-            if free = cap then // not empty?
-                res <- Some (Array.copy data.[deqptr])
-                deqptr <- (deqptr + 1) % cap
-                free <- free + 1
-            res
-            
+    /// Overflow: tail + 1 = head and Put(msg) is called. 
+    /// Underflow: when the queue is empty (tail + 1 = head) and Take()
+    /// Wrap: if index + 1 = cap then index = 0
+    type Queue(cap:int) as __ =
+        let locker = obj()
+        let capacity = cap
+        let mutable tail = 0
+        let mutable head = 0
+        let data : string[] = Array.zeroCreate cap
+        //let data : byte[][] = [| for a in 0 .. cap - 1  do yield [||] |]
+        let rwlock = new ReaderWriterLock()
+
         // Write if not full
-        member __.Enqueue(msg : byte[]) : bool = 
-            if free > 0 then
-                data.[enqptr] <- Array.copy msg
-                enqptr <- (enqptr + 1) % cap
-                free <- free - 1
-                true
-            else
-                false
+        //member __.Put(msg : byte[]) : bool = 
+        member __.Put(msg : string) : bool = 
+            writeLock rwlock (fun () ->
+                let newtail = if tail + 1 = cap then 0 else tail + 1
+                if newtail <> head then // not full
+                    //data.[tail] <- Array.copy msg
+                    data.[tail] <- msg
+                    tail <- newtail
+                    true
+                else // full
+                    false
+                ) 
+
+        // Return Some copy of msg or None if empty 
+        //member __.Take() : byte[] option =
+        member __.Take() : string option =
+            readLock rwlock (fun () ->
+                if head <> tail then // not empty
+                    let oldhead = head
+                    if head + 1 = cap then head <- 0 else head <- head + 1
+                    //Some (Array.copy data.[oldhead])
+                    Some data.[oldhead]
+                else 
+                    None
+                )

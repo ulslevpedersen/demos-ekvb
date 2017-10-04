@@ -11,17 +11,11 @@ module HTTPUTIL =
     open System.IO
     open System.Text
 
-    // GET
-    //let myCallbacker (reader:IO.StreamReader option) url = 
-    //    if reader.IsSome then 
-    //        let content = reader.Value.ReadToEnd()
-    //        printfn "%s" content //url
-    //        content
-    //    else
-    //        ""
+    // Queue for sending "real" responses
+    let txQueue = new Queue(2)
         
     // Fetch the contents of a web page
-    let fetchUrl url = 
+    let fetchUrlAsync url = 
         async {
             try  
                 let req = WebRequest.Create(Uri(url)) 
@@ -191,7 +185,27 @@ module HTTPUTIL =
 
                 if dosend then
                     prn ""
-                    prn (sprintf "LIPS sending: %s" (remoteaddr + iptxtout))
-                    let blaahund = Async.RunSynchronously (fetchUrl (remoteaddr + iptxtout))
+                    if txQueue.Put(remoteaddr + iptxtout) then 
+                        prn (sprintf "LIPS tx queued: %s" (remoteaddr + iptxtout))
+                    else
+                        prn (sprintf "LIPS not queued: %s" (remoteaddr + iptxtout))
+                    
+                    //let blaahund = Async.RunSynchronously (fetchUrl (remoteaddr + iptxtout))
                     ()   
             }), localaddr, remoteaddr)
+
+    // TX SENDER
+
+    // Takes items fromt the txqueue every PX milliseconds
+    let startFetcher() =
+        async {
+            let px = 1000 //ms
+            while true do
+                let aurl = txQueue.Take()  
+                if aurl.IsSome then
+                    prn (sprintf "Took \"%s\" from tx queue" aurl.Value)
+                    do! fetchUrlAsync(aurl.Value) 
+                else
+                    prn "noting in tx queue"
+                do! Async.Sleep px
+        }
