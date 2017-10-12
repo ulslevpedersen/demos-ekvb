@@ -18,12 +18,14 @@ module HTTPUTIL =
     let fetchUrlAsync url = 
         async {
             try  
-                let req = WebRequest.Create(Uri(url)) 
+                let req = HttpWebRequest.Create(Uri(url))
+                let httpreq = req :?> HttpWebRequest
+                httpreq.KeepAlive <- false
                 use! resp = req.AsyncGetResponse() 
                 use stream = resp.GetResponseStream() 
                 use reader = new IO.StreamReader(stream) 
                 let content = reader.ReadToEnd()//callback (Some reader) url
-                printfn "%s" content //url
+                printfn "::HTTP RESPONSE START::\n%s\n::HTTP RESPONSE END::" content //url
             with 
             | :? System.Net.WebException as ex -> 
                 printfn "Web error, no answer from: %s \n%s" url ex.Message
@@ -182,6 +184,11 @@ module HTTPUTIL =
                 resp.ContentType <- "text/plain"
                 resp.OutputStream.Write(txt, 0, txt.Length)
                 resp.OutputStream.Close()
+                // be nice to ms
+                resp.Close();
+                prn "TEST"
+                prn (sprintf "Sent this to remote server")//:\n%s" (txt.ToString()))
+                //Async.Sleep(100) |> ignore
 
                 if dosend then
                     prn ""
@@ -203,9 +210,9 @@ module HTTPUTIL =
             while true do
                 let aurl = txQueue.Take()  
                 if aurl.IsSome then
-                    prn (sprintf "Took \"%s\" from tx queue" aurl.Value)
+                    prn (sprintf "Took packet \"%s\" from tx queue" aurl.Value)
                     do! fetchUrlAsync(aurl.Value) 
                 else
-                    prn "noting in tx queue"
+                    prn "Noting in tx queue"
                 do! Async.Sleep px
         }

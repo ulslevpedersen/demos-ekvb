@@ -17,17 +17,18 @@ module MainModule =
 
     // LOCAL CLIENT (LIPSClient)
     // ngrok http -subdomain=pingrt -host-header=localhost 8080
-    // let localaddr = "http://localhost:8084/"
-    let localaddr = "http://localhost:8080/"
+    let localaddr = "http://localhost:8080/" 
     
-    // REMOTE SERVER (LIPSServer when testing on localhost)
-    // let remoteaddr = "http://localhost:8080/"
-    //let remoteaddr = "http://pingrt.ngrok.io/"
-    let remoteaddr = "http://87cbaa5a.ngrok.io/"
+    // REMOTE SERVER 
+    //LIPSServer when testing on localhost or second laptop:
+    //let remoteaddr = "http://pingrt1.ngrok.io/" //-> localhost:8081
+    //ms:
+    let remoteaddr = "http://d51eb215.ngrok.io/"
     
  
     [<EntryPoint>]
     let main argv = 
+        A.Instance.SetOut(System.Console.Out)
         Async.Start (startFetcher())
         // Listen for server new packets / responses
         startlisterner (localaddr, remoteaddr)
@@ -65,8 +66,8 @@ module MainModule =
             else
                 prn (sprintf "Could not queue new ICMP request %d" i)
             i <- i + 1
-            System.Threading.Thread.Sleep 5000
+            System.Threading.Thread.Sleep 10000
 
-        let e = IPPacket.ICMPPROTOCOL
+        //let e = IPPacket.ICMPPROTOCOL
         System.Console.ReadKey() |> ignore
         0 // return an integer exit code

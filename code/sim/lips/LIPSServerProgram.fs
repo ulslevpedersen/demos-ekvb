@@ -9,15 +9,13 @@ module MainModule =
     open System
     open LIPSLIB.HTTPUTIL
 
-    // LOCAL (:8080 also when it is server in LIPSServer)
-    // ngrok http -subdomain=pingrt -host-header=localhost 8080
-    let localaddr = "http://localhost:8080/"
+    // LOCAL SERVER
+    // ngrok http -subdomain=pingrt1 -host-header=localhost 8081
+    let localaddr = "http://localhost:8081/"
 
     // REMOTE (LIPSClient when testing on localhost)
-    let remoteaddr = "http://localhost:8084/"
-    //let remoteaddr = "http://pingrt.ngrok.io/"
+    let remoteaddr = "http://pingrt.ngrok.io/" //->localhost:8080
     //let remoteaddr = "http://87cbaa5a.ngrok.io/"
-    
         
     [<EntryPoint>]
     let main argv = 

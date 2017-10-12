@@ -9,13 +9,27 @@ module Util =
     open System
     open System.Threading
 
+    type A private () =
+        let mutable out = System.Console.Out
+        static let instance = A()
+        static member Instance = instance
+        member this.SetOut(outio : IO.TextWriter) =
+            out <- outio
+        member this.Prn(str : string) = 
+            out.WriteLineAsync(str)
+        member this.Pr(str : string) = 
+            out.WriteAsync(str)
+
     // Example: 'prn (sprintf "%d" 123)'
     let prn (str : string) = 
-        System.Console.WriteLine(str)
+        A.Instance.Prn(str) |> ignore
+        //System.Console.WriteLine(str)
+        //System.Console.Out.Flush()
         System.Diagnostics.Debug.WriteLine(str)
 
     let pr (str : string) =
-        System.Console.Write(str)
+        //System.Console.Write(str)
+        A.Instance.Pr(str) |> ignore
         System.Diagnostics.Debug.Write(str)
     
     // I.e.: 0xB -> 'B'
