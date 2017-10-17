@@ -180,7 +180,7 @@ module HTTPUTIL =
                               "(              Is ICMP: \"" + string(isICMP) + "\"\n"            +   
                               "( Is ICMP echo request: \"" + string(isICMPEchoRequest) + "\"\n" +
                               "(   Is ICMP echo reply: \"" + string(isICMPEchoReply) + "\"\n"   +
-                              "(                 Sent: \"" + iptxtout + "\"\n")
+                              "(                 Sent: \"" + iptxtout + "\"\n\r\n\r\n")
                 resp.ContentType <- "text/plain"
                 resp.OutputStream.Write(txt, 0, txt.Length)
                 resp.OutputStream.Close()
