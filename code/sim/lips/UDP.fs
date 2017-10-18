@@ -17,7 +17,7 @@
 //  |          data octets ...
 //  +---------------- ...
 //
-//Pseudo-header for checksum
+//Pseudo-header prepended UDP header for checksum purposes
 //  0      7 8     15 16    23 24    31
 //  +--------+--------+--------+--------+
 //  |          source address           |
@@ -38,13 +38,16 @@ module UDP =
         let length     = 0xFFFF
         let chksum     = 0xFFFF
         let mutable data : byte [] = Array.zeroCreate 0
+        let mutable ip = IPPacket()
+
+        let ploadtest = [|byte 0xC0; byte 0xFF; byte 0xEE|]
 
         do  // Some values
             __.SPort    <- 0x2345
             __.DPort    <- 0x6789
-            __.Len      <- 0x0008 + 0x0003 // 0xB
             // Chksum below
-            __.Data     <- [|byte 0xC0; byte 0xFF; byte 0xEE|]
+            __.Len      <- 0x0008 + ploadtest.Length
+            __.Data     <- ploadtest
             __.Chksum   <- __.CalculateChecksum()
         
         member __.Header with get()      = header and
@@ -63,6 +66,8 @@ module UDP =
                                            header.[7] <- byte value
         member __.Data with get()        = data and
                             set(value)   = data <- value
+        member __.IP with get()          = ip and 
+                          set(value)     = ip <- value
 
         member __.Print() =
             prn (sprintf "UDP.SPort:    0x%04X          Header[0,1]: 0x%02X 0x%02X" __.SPort  __.Header.[0] __.Header.[1])
@@ -75,6 +80,9 @@ module UDP =
                 pr (sprintf "0x%02X " data.[i])
                 if (i + 1) % 4 = 0 then 
                     prn ""
+
+        member __.PrintIP() =
+            __.IP.Print()
 
 //TODO
         member __.CalculateChecksum() =
