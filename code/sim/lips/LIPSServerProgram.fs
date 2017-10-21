@@ -9,11 +9,11 @@ module MainModule =
     open System
     open LIPSLIB.HTTPUTIL
 
-    // LOCAL SERVER
+    // LOCAL SERVER //
     // ngrok http -subdomain=pingrt1 -host-header=localhost 8081
     let localaddr = "http://localhost:8081/"
 
-    // REMOTE (LIPSClient when testing on localhost)
+    // REMOTE (LIPSClient when testing on localhost) //
     let remoteaddr = "http://pingrt.ngrok.io/" //->localhost:8080
     //let remoteaddr = "http://87cbaa5a.ngrok.io/"
         
@@ -23,4 +23,4 @@ module MainModule =
         Async.Start (startFetcher())
         startlisterner (localaddr, remoteaddr)
         System.Console.ReadKey() |> ignore
-        0 // return an integer exit code
+        0

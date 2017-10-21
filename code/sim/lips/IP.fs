@@ -3,22 +3,22 @@
 // License: Simplified BSD License
 // LIPS: IP packet
 
-//RFC 791:  Internet Header Format
-//   0                   1                   2                   3
-//   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  |Version|  IHL  |Type of Service|          Total Length         |
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  |         Identification        |Flags|      Fragment Offset    |
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  |  Time to Live |    Protocol   |         Header Checksum       |
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  |                       Source Address                          |
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  |                    Destination Address                        |
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  |                    Options                    |    Padding    |
-//  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// RFC 791:  Internet Header Format
+//  0                   1                   2                   3
+//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |Version|  IHL  |Type of Service|          Total Length         |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |         Identification        |Flags|      Fragment Offset    |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |  Time to Live |    Protocol   |         Header Checksum       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                       Source Address                          |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                    Destination Address                        |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                    Options                    |    Padding    |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 namespace LIPSLIB
 [<AutoOpen>]
@@ -28,21 +28,12 @@ module IP =
     type IPPacket() as __ =
         let ver_mask     = 0b1111_0000
         let hdr_mask     = 0b0000_1111
-        let tos_mask     = 0b1111_1111
-        let tlen_mask    = 0xFFFF
-        let id_mask      = 0xFFFF
         let flags_mask   = 0b111
-        let foff_mask    = 0b1_1111_1111_1111
-        let ttl_mask     = 0xFF
-        let prot_mask    = 0xFF
-        let hchksum_mask = 0xFFFF
-        let srcip_mask   = 0xFFFFFFFF
-        let dstip_mask   = 0xFFFFFFFF
-        
+       
         let mutable header : byte[] = Array.zeroCreate 20 // 20 bytes header
         let mutable data : byte array = Array.zeroCreate 0 
 
-        do // create "standard" packet
+        do  // Create "standard" packet
             __.Ver     <-  4 // version, 4, IPv4
             __.Hdr     <-  5 // num of 32-bit words (5)
             __.Tos     <-  0 // type of service
@@ -59,7 +50,9 @@ module IP =
             __.Tlen    <- __.CalculateTlen() // total length in bytes
             __.Hchksum <- __.CalculateChecksum()
 
-        static member ICMPPROTOCOL  = 1 // .Prot
+        static member ICMPPROTOCOL = 0x01 // .Prot for ICMP = 1
+        static member UDPPROTOCOL  = 0x11 // .Prot for UDP = 17 
+
         member __.Header with get()      = header and
                               set(value) = header <- value
         
@@ -153,12 +146,8 @@ module IP =
             checksum <- checksum + (int header.[14] <<< 8) + int header.[15]
             checksum <- checksum + (int header.[16] <<< 8) + int header.[17]
             checksum <- checksum + (int header.[18] <<< 8) + int header.[19]
-            if (checksum &&& 0xFFFF0000 > 0) then // sign problem?
-                checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
-            if (checksum &&& 0xFFFF0000 > 0) then
-                checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF) //TODO: enough?
-            checksum <- ~~~checksum 
-            checksum &&& hchksum_mask
+            checksum <- checksumCarryRound(checksum)
+            checksum
         
         member __.Print() =
             // word 0: version, header length, total length
@@ -198,8 +187,15 @@ module IP =
 
             //__.Data   |> Array.iteri (fun i l -> prn(sprintf  "Data[%02d]: 0x%02X" i l))
 
+        /// Convert or "raise" the IP header and data bytes to ascii and return as a string
+        member __.AsStr() =
+            bytearray2str(Array.concat [__.Header; __.Data])
+
         member __.IsICMP() =
             __.Prot = IPPacket.ICMPPROTOCOL
+
+        member __.IsUDP() =
+            __.Prot = IPPacket.UDPPROTOCOL
 
         member __.SwitchSrcDstIP() =
             let srcip = __.SrcIP

@@ -95,3 +95,32 @@ module Util =
             //Thread.MemoryBarrier() //TODO
         finally
             rwlock.ReleaseWriterLock()
+
+    // Protocols //
+
+    // checksum only for data part of packets
+    let checksumData(data : byte[]) =
+        let mutable datachecksum = 0
+        if data.Length = 0 then
+            ()
+        else if data.Length = 1 then
+            datachecksum <- (int data.[0] <<< 8) // Pad with a "zero"
+        else
+            for i in 0 .. 2 .. data.Length - 2 do // byte "pairs"
+                datachecksum <- datachecksum + ((int data.[i] <<< 8) ||| (int data.[i+1]))
+            if data.Length % 2 <> 0 then // one byte left
+                datachecksum <- datachecksum + (int data.[data.Length - 1] <<< 8)
+        datachecksum
+
+    // add in carry and round to 16 bits
+    let checksumCarryRound(chksumcarry : int) =
+        let mutable checksum = chksumcarry
+        if (checksum &&& 0xFFFF0000 > 0) then 
+            checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
+        if (checksum &&& 0xFFFF0000 > 0) then
+            checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
+        if (checksum &&& 0xFFFF0000 > 0) then
+            checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
+        checksum <- ~~~checksum
+        checksum &&& 0x0000FFFF
+        

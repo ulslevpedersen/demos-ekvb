@@ -40,23 +40,23 @@ module ICMP =
         static member ICMPECHOREQUEST with get() = 8
         static member ICMPECHOREPLY   with get() = 0
 
-        member __.Header with get()      = header and
-                              set(value) = header <- value
+        member __.Header with get()        = header and
+                              set(value)   = header <- value
         member __.Icmptype with get()      = int header.[0] and
                                 set(value) = header.[0] <- byte value
-        member __.Code with get()      = int header.[1] and
-                            set(value) = header.[1] <- byte value
-        member __.Chksum with get()      = (int header.[2] <<< 8) ||| (int header.[3]) and
-                              set(value) = header.[2] <- byte(value >>> 8)
-                                           header.[3] <- byte value
-        member __.Id with get()      = (int header.[4] <<< 8) ||| (int header.[5]) and
-                          set(value) = header.[4] <- byte(value >>> 8)
-                                       header.[5] <- byte value                                       
-        member __.Seqno with get()      = (int header.[6] <<< 8) ||| (int header.[7]) and
-                             set(value) = header.[6] <- byte(value >>> 8)
-                                          header.[7] <- byte value
-        member __.Data with get()      = data and
-                            set(value) = data <- value
+        member __.Code with get()          = int header.[1] and
+                            set(value)     = header.[1] <- byte value
+        member __.Chksum with get()        = (int header.[2] <<< 8) ||| (int header.[3]) and
+                              set(value)   = header.[2] <- byte(value >>> 8)
+                                             header.[3] <- byte value
+        member __.Id with get()            = (int header.[4] <<< 8) ||| (int header.[5]) and
+                          set(value)       = header.[4] <- byte(value >>> 8)
+                                             header.[5] <- byte value                                       
+        member __.Seqno with get()         = (int header.[6] <<< 8) ||| (int header.[7]) and
+                             set(value)    = header.[6] <- byte(value >>> 8)
+                                             header.[7] <- byte value
+        member __.Data with get()          = data and
+                            set(value)     = data <- value
 
         member __.Print() =
             prn (sprintf "ICMPPacket.Icmptype: 0x%02X            Header[0]:   0x%02X" __.Icmptype __.Header.[0])
@@ -73,32 +73,21 @@ module ICMP =
                     prn ""
 
         member __.CalculateChecksum() =
-            let mutable checksum = ((int header.[0] <<< 8) ||| (int header.[1]))
+            let mutable checksum = 0
+            checksum <- checksum + ((int header.[0] <<< 8) ||| (int header.[1]))
             checksum <- checksum + ((int header.[4] <<< 8) ||| (int header.[5]))
             checksum <- checksum + ((int header.[6] <<< 8) ||| (int header.[7]))
-            if data.Length = 1 then
-                checksum <- checksum + (int data.[0] <<< 8) // Padding with a "zero"
-            else
-                for i in 0 .. 2 .. data.Length - 2 do // there will be one or two bytes left
-                    checksum <- checksum + ((int data.[i] <<< 8) ||| (int data.[i+1]))
-                if data.Length % 2 = 0 then // two bytes left
-                    checksum <- checksum + ((int data.[data.Length - 2] <<< 8) ||| (int data.[data.Length - 1]))
-                else // one byte left
-                    checksum <- checksum + (int data.[data.Length - 1] <<< 8) // Padding with "zero"
-            if (checksum &&& 0xFFFF0000 > 0) then 
-                 checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
-            if (checksum &&& 0xFFFF0000 > 0) then
-                 checksum <- (checksum >>> 16) + (checksum &&& 0x0000FFFF)
-            checksum <- ~~~checksum
-            checksum &&& 0x0000FFFF
+            checksum <- checksum + checksumData(__.Data)
+            checksum <- checksumCarryRound(checksum)
+            checksum
 
         member __.CreateICMPEchoReply(icmprequest:ICMPMessage) =
-               let icmpreply = new ICMPMessage()
-               icmpreply.Header <- Array.copy icmprequest.Header
-               icmpreply.Data <- Array.copy icmprequest.Data
-               icmpreply.Icmptype <- ICMPMessage.ICMPECHOREPLY
-               icmpreply.Chksum <- icmpreply.CalculateChecksum()
-               icmpreply
+            let icmpreply = new ICMPMessage()
+            icmpreply.Header <- Array.copy icmprequest.Header
+            icmpreply.Data <- Array.copy icmprequest.Data
+            icmpreply.Icmptype <- ICMPMessage.ICMPECHOREPLY
+            icmpreply.Chksum <- icmpreply.CalculateChecksum()
+            icmpreply
 
         member __.IsICMPEchoRequest() =
             __.Icmptype = ICMPMessage.ICMPECHOREQUEST
