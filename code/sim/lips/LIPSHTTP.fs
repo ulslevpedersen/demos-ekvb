@@ -146,6 +146,7 @@ module HTTPUTIL =
                 let mutable isICMP = false
                 let mutable isICMPEchoReply = false
                 let mutable isICMPEchoRequest = false
+                let mutable isUDP = false
                 let mutable iptxtout = ""
                 if isBlaaHund then
                     let ipin = ipdecode(iptxtin)
@@ -168,27 +169,29 @@ module HTTPUTIL =
                                     dosend <- true
                                 else if icmpin.Value.IsICMPEchoReply() then
                                     isICMPEchoReply <- true
-                
- 
-
+                        elif ipin.Value.IsUDP() then
+                            isUDP <- true
+                            let udp = UDPDatagram()
+                            udp.Header <- ipin.Value.Data.[0..7]
+                            udp.Data   <- ipin.Value.Data.[8..]
+                            udp.Print()
                 let datetxt = System.DateTime.Now.ToString();
-                let txt = Encoding.ASCII.GetBytes(
-                              "(     Remote LIPS info: \"" + datetxt + "\"\n"                   +
-                              "(             Received: \"" + iptxtin + "\"\n"                   +
-                              "(          Is BlaaHund: \"" + string(isBlaaHund) + "\"\n"        +
-                              "(                Is IP: \"" + string(isIP) + "\"\n"              +
-                              "(              Is ICMP: \"" + string(isICMP) + "\"\n"            +   
-                              "( Is ICMP echo request: \"" + string(isICMPEchoRequest) + "\"\n" +
-                              "(   Is ICMP echo reply: \"" + string(isICMPEchoReply) + "\"\n"   +
-                              "(                 Sent: \"" + iptxtout + "\"\n\r\n\r\n")
+                let txt =     "(      Informal 'debug' info on the latest packet:\n"             +
+                              "(      Remote LIPS info: \"" + datetxt + "\"\n"                   +
+                              "(              Received: \"" + iptxtin + "\"\n"                   +
+                              "(           Is BlaaHund: \"" + string(isBlaaHund) + "\"\n"        +
+                              "(                 Is IP: \"" + string(isIP) + "\"\n"              +
+                              "(                Is UDP: \"" + string(isUDP) + "\"\n"             +
+                              "(               Is ICMP: \"" + string(isICMP) + "\"\n"            +   
+                              "(  Is ICMP echo request: \"" + string(isICMPEchoRequest) + "\"\n" +
+                              "(    Is ICMP echo reply: \"" + string(isICMPEchoReply) + "\"\n"   +
+                              "( Reply (if applicable): \"" + iptxtout + "\""
                 resp.ContentType <- "text/plain"
-                resp.OutputStream.Write(txt, 0, txt.Length)
+                let txtBytes = Encoding.ASCII.GetBytes(txt)
+                resp.OutputStream.Write(txtBytes, 0, txtBytes.Length)
                 resp.OutputStream.Close()
-                // be nice to ms
                 resp.Close();
-                prn "TEST"
-                prn (sprintf "Sent this to remote server")//:\n%s" (txt.ToString()))
-                //Async.Sleep(100) |> ignore
+                prn (sprintf "Sent this informal 'debug' info back:\n%s" txt)
 
                 if dosend then
                     prn ""

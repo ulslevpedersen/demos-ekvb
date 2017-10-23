@@ -171,7 +171,7 @@ module IP =
                           (Convert.ToString(__.Foff,2).PadLeft(13, '0')) (header.[6] &&& byte 0b11111) header.[7])
             prn (sprintf "IPPacket.Ttl:        0x%02X            Header[8]:           0x%02X" 
                           __.Ttl header.[8])
-            prn (sprintf "IPPacket.Prot:       0x%02X            Header[09]:          0x%02X" 
+            prn (sprintf "IPPacket.Prot:       0x%02X            Header[9]:           0x%02X" 
                           __.Prot header.[9])
             prn (sprintf "IPPacket.Hchksum:    0x%04X          Header[10,11]:       0x%02X 0x%02X" 
                           __.Hchksum header.[10] header.[11])
@@ -184,7 +184,7 @@ module IP =
                     pr (sprintf "IPPacket.Data[%02d]:   " i)
                 pr (sprintf  "0x%02X " data.[i])
                 if (i + 1) % 4 = 0 then prn ""
-
+            if data.Length % 4 <> 0 then prn ""
             //__.Data   |> Array.iteri (fun i l -> prn(sprintf  "Data[%02d]: 0x%02X" i l))
 
         /// Convert or "raise" the IP header and data bytes to ascii and return as a string

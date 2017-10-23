@@ -7,8 +7,8 @@
 // Server: "1.2.3.5"
 
 namespace lips
-module MainModule = 
 
+module MainModule = 
     open System
     open LIPSLIB.Util
     open LIPSLIB
@@ -22,9 +22,9 @@ module MainModule =
     
     // REMOTE SERVER 
     //LIPSServer when testing on localhost or second laptop:
-    //let remoteaddr = "http://pingrt1.ngrok.io/" //-> localhost:8081
+    let remoteaddr = "http://pingrt1.ngrok.io/" //-> localhost:8081
     //ms:
-    let remoteaddr = "http://d51eb215.ngrok.io/"
+    //let remoteaddr = "http://d51eb215.ngrok.io/"
     
     /// Send UDP datagrams to server
     let sendudp() =
@@ -32,11 +32,11 @@ module MainModule =
             let mutable i = 0
             while true do
                 let udpdatagram = UDPDatagram()
-                udpdatagram.IP.Tlen    <- udpdatagram.IP.CalculateTlen()
-                udpdatagram.IP.Hchksum <- udpdatagram.IP.CalculateChecksum()
+                udpdatagram.UpdateIPOnData()
                 prn (sprintf "(%d) New IP/UDP to be sent to remote server:" i)
                 udpdatagram.IP.Print()
                 udpdatagram.Print()
+//TODO: Is the first packet sent?
                 if txQueue.Put(remoteaddr + udpdatagram.IP.AsStr()) then
                     prn (sprintf "TX queued new UDP datagram %d" i)
                 else
@@ -82,6 +82,7 @@ module MainModule =
  
     [<EntryPoint>]
     let main argv = 
+       
         A.Instance.SetOut(System.Console.Out)
         Async.Start (startFetcher())
         // Listen for server new packets / responses

@@ -71,6 +71,7 @@ module Util =
         ba
 
     // [|0xCA;0xFE;0xBA;0xBE|] -> "CAFEBABE" (twice the length)
+//TODO: System.Text.Encoding.ASCII.GetString(buf) ?
     let bytearray2str (bytes:byte[]) =
         let strarray = Array.zeroCreate<string> (bytes.Length * 2)
         for i in 0 .. bytes.Length-1 do
