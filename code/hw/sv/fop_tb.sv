@@ -11,7 +11,6 @@ module fop_tb ();
     // testbench clock
     logic tb_clk;
 
-    
     logic fop_reset;
     logic fop_enable;
     fop fop_ (
@@ -20,7 +19,7 @@ module fop_tb ();
                   .enable ( fop_enable )    
              );
     
-    // init and generate clock
+    // init and generate 100 Mhz clock
     initial
     begin
         tb_clk = 1'b0;

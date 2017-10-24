@@ -1,5 +1,6 @@
 #demos-ekvb make
-all: allil allfs allsv
+#all: allil allfs allsv
+all: allsv
 	
 clean: cleanil cleanfs cleansv
 	
@@ -55,8 +56,8 @@ helpfs:
 allsv: cleansv compme simme
 	
 compme: cleansv
-	cd sv && \
-	cp ../fs/mem.sv mem.sv
+	#cd sv && \
+	#cp ../fs/mem.sv mem.sv
 	cd sv && \
 	vlib work
 	cd sv && \
@@ -72,9 +73,10 @@ cleansv:
 	rm -f transcript
 	cd sv && \
 	rm -rf work	
-	cd sv && \
-	rm -f mem.sv
+	#cd sv && \
+	#rm -f mem.sv
 helpsv:
 	#fop.sv:
 	#'compme' to compile
 	#'simme' to simulate
+	#demos-man.tex is in hw/tex
