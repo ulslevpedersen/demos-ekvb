@@ -24,7 +24,7 @@ module QueueModule =
         // Write if not full
         //member __.Put(msg : byte[]) : bool = 
         member __.Put(msg : string) : bool = 
-            writeLock rwlock (fun () ->
+//            writeLock rwlock (fun () ->
                 let newtail = if tail + 1 = cap then 0 else tail + 1
                 if newtail <> head then // not full
                     //data.[tail] <- Array.copy msg
@@ -33,12 +33,12 @@ module QueueModule =
                     true
                 else // full
                     false
-                ) 
+//                ) 
 
         // Return Some copy of msg or None if empty 
         //member __.Take() : byte[] option =
         member __.Take() : string option =
-            readLock rwlock (fun () ->
+//            readLock rwlock (fun () ->
                 if head <> tail then // not empty
                     let oldhead = head
                     if head + 1 = cap then head <- 0 else head <- head + 1
@@ -46,4 +46,4 @@ module QueueModule =
                     Some data.[oldhead]
                 else 
                     None
-                )
+//                )
