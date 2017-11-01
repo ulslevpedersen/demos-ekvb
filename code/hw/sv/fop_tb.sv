@@ -1,13 +1,12 @@
-// Copyright: 2015-17, Copenhagen Business School
-// Author: Rasmus Ulslev Pedersen (rup.itm@cbs.dk)
+// Copyright: 2015-, Copenhagen Business School
+// Author: Rasmus Ulslev Pedersen (rp.digi@cbs.dk)
 // License: Simplified BSD License
 //
 // fop testbench
 
-`timescale 1ns / 1ps
+module fop_tb; 
+    timeunit 1ns; timeprecision 1ns;
 
-module fop_tb (); 
-    
     // testbench clock
     logic tb_clk;
 

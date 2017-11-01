@@ -1,289 +1,354 @@
-// Copyright: 2015-17, Copenhagen Business School
-// Author: Rasmus Ulslev Pedersen (rup.itm@cbs.dk)
+// Copyright: 2015-, Copenhagen Business School
+// Author: Rasmus Ulslev Pedersen (rp.digi@cbs.dk)
 // License: Simplified BSD License
 //
 // fop 
 
-`timescale 1ns / 1ps
 // vlog -work work .\fop.sv
 // vlog -work work .\fop_tb.sv
 // vsim -c -do "run -all;quit" fop_tb
 module fop
-          (
-               input clk,
-               input reset,
-               input enable 
-          );
+(
+  input clk,
+  input reset,
+  input enable 
+);
+  timeunit 1ns; timeprecision 1ns;
           
-    enum logic [31:0] {
-        NOPx00    		= 32'h0000, // ->
-        BREAKx01  		= 32'h0001, // ->
-        LDARG0x02 		= 32'h0002, // -> value
-        LDARG1x03 		= 32'h0003, // -> value
-        LDARG2x04 		= 32'h0004, // -> value
-        LDARG3x05 		= 32'h0005, // -> value
-        LDLOC0x06 		= 32'h0006, // -> value
-        LDLOC1x07 		= 32'h0007, // -> value
-        LDLOC2x08 		= 32'h0008, // -> value
-        LDLOC3x09 		= 32'h0009, // -> value
-        STLOC0x0A 		= 32'h000A, // ., value -> .
-        STLOC1x0B 		= 32'h000B, // ., value -> .
-        STLOC2x0C 		= 32'h000C, // ., value -> .
-        STLOC3x0D 		= 32'h000D, // ., value -> .
-        STARGSx10 		= 32'h0010, // ., value -> ., 
-        LDLOCSx11 		= 32'h0011, // -> value
-        LDLOCASx12		= 32'h0012, // -> address
-        STLOCSx13 		= 32'h0013, // ., value -> .
-        LDNULLx14 		= 32'h0014, // -> null, value
-        LDCI4M1x15		= 32'h0015, // -> num
-        LDCI40x16 		= 32'h0016, // -> num
-        LDCI41x17 		= 32'h0017, // -> num
-        LDCI42x18 		= 32'h0018, // -> num
-        LDCI43x19 		= 32'h0019, // -> num
-        LDCI44x1A 		= 32'h001A, // -> num
-        LDCI45x1B 		= 32'h001B, // -> num
-        LDCI46x1C 		= 32'h001C, // -> num
-        LDCI47x1D 		= 32'h001D, // -> num
-        LDCI48x1E 		= 32'h001E, // -> num
-        LDCI44Sx1F 		= 32'h001F, // -> num
+     enum logic [31:0] {
+        NOPx00         = 32'h0000, // ->
+        BREAKx01       = 32'h0001, // ->
+        LDARG0x02      = 32'h0002, // -> value
+        LDARG1x03      = 32'h0003, // -> value
+        LDARG2x04      = 32'h0004, // -> value
+        LDARG3x05      = 32'h0005, // -> value
+        LDLOC0x06      = 32'h0006, // -> value
+        LDLOC1x07      = 32'h0007, // -> value
+        LDLOC2x08      = 32'h0008, // -> value
+        LDLOC3x09      = 32'h0009, // -> value
+        STLOC0x0A      = 32'h000A, // ., value -> .
+        STLOC1x0B      = 32'h000B, // ., value -> .
+        STLOC2x0C      = 32'h000C, // ., value -> .
+        STLOC3x0D      = 32'h000D, // ., value -> .
+        STARGSx10      = 32'h0010, // ., value -> ., 
+        LDLOCSx11      = 32'h0011, // -> value
+        LDLOCASx12     = 32'h0012, // -> address
+        STLOCSx13      = 32'h0013, // ., value -> .
+        LDNULLx14      = 32'h0014, // -> null, value
+        LDCI4M1x15     = 32'h0015, // -> num
+        LDCI40x16      = 32'h0016, // -> num
+        LDCI41x17      = 32'h0017, // -> num
+        LDCI42x18      = 32'h0018, // -> num
+        LDCI43x19      = 32'h0019, // -> num
+        LDCI44x1A      = 32'h001A, // -> num
+        LDCI45x1B      = 32'h001B, // -> num
+        LDCI46x1C      = 32'h001C, // -> num
+        LDCI47x1D      = 32'h001D, // -> num
+        LDCI48x1E      = 32'h001E, // -> num
+        LDCI44Sx1F     = 32'h001F, // -> num
         
-        LDARGSx0E 		= 32'h000E, // -> value
-        LDARGASx0F		= 32'h000F, // -> -> address of argument number argNum
-        LDCI4x20  		= 32'h0020, // -> num
-        LDCI8x21  		= 32'h0021, // -> num
-        LDCR4x22  		= 32'h0022, // -> num
-        LDCR8x23  		= 32'h0023, // -> num
-        DUPx25    		= 32'h0025, // value -> value, value
-        POPx26    		= 32'h0026, // ., value -> .
-        JMPx27    		= 32'h0027, // ->
-        CALLx28   		= 32'h0028, // ?                  -> .
-        CALLIx29  		= 32'h0029, // arg0, arg1, . , argn, ftn -> retVal (sometimes)
-        //RETx2A        = 32'h002A, // -> (???)
-        BRSx2B    		= 32'h002B, // ->
-        BRFALSESx2C		= 32'h002C, // value ->
-        BRTRUESx2D		= 32'h002D, // value ->
-        BEQSx2E   		= 32'h002E, // value1, value2 ->
-        BGESx2F   		= 32'h002F, // value1, value2 ->
-        BGTSx30   		= 32'h0030, // value1, value2 ->
-        BLESx31   		= 32'h0031, // value1, value2 ->
-        BLTSx32   		= 32'h0032, // value1, value2 ->
-        BNEUNSx33 		= 32'h0033, // value1, value2 ->
-        BGEUNSx34 		= 32'h0034, // value1, value2 ->
-        BGTUNSx35 		= 32'h0035, // value1, value2 ->
-        BLEUNSx36 		= 32'h0036, // value1, value2 ->
-        BLTUNSx37 		= 32'h0037, // value1, value2 ->
-        BRx38     		= 32'h0038, // ?                  -> ?
-        BRFALSEx39		= 32'h0039, // value ->
-        BRTRUEx3A 		= 32'h003A, // value ->
-        //BRINSTx3A 	= 32'h003A, // value ->
-        BEQx3B    		= 32'h003B, // value1, value2 ->
-        BGEx3C    		= 32'h003C, // value1, value2 ->
-        //BGTx3D    	= 32'h002E, // value1, value2 ->
-        BLEx3E    		= 32'h003E, // value1, value2 ->
-        BLTx3F    		= 32'h003F, // ?                  -> ?
-        BNEUNx40  		= 32'h0040, // value1, value2 ->
-        BGEUNx41  		= 32'h0041, // value1, value2 ->
-        BGTUNx42  		= 32'h0042, // value1, value2 ->
-        BLEUNx43  		= 32'h0043, // value1, value2 -> 
-        BLTUNx44  		= 32'h0044, // value1, value2 ->
-        SWITCHx45 		= 32'h0045, // ., value -> .
-        LDINDI1x46		= 32'h0046, // addr -> value
-        LDINDU1x47		= 32'h0047, // addr -> value
-        LDINDI2x48		= 32'h0048, // addr -> value
-        LDINDU2x49		= 32'h0049, // addr -> value
-        LDINDI4x4A		= 32'h004A, // addr -> value
-        LDINDU4x4B		= 32'h004B, // addr -> value
-        LDINDI8x4C		= 32'h004C, // addr -> value
-        //LDINDU8x4C	= 32'h004C, // addr -> value
-        LDINDIx4D 		= 32'h004D, // addr -> value
-        LDINDR4x4E		= 32'h004E, // addr -> value
-        LDINDR8x4F		= 32'h004F, // addr -> value
-        LDINDREFx50		= 32'h0050, // addr -> value
-        STINDREFx51		= 32'h0051, // ., addr, val -> .
-        STNDI1x52 		= 32'h0052, // ., addr, val -> .
-        STINDI2x53		= 32'h0053, // ., addr, val -> .
-        STINDI4x54		= 32'h0054, // ., addr, val -> .
-        STINDI8x55		= 32'h0055, // ., addr, val -> .
-        STINDR4x56		= 32'h0056, // ., addr, val -> .
-        STINDR8x57		= 32'h0057, // ., addr, val -> .
-        ADDx58   		= 32'h0058, // x,y -> z
-        SUBx59   		= 32'h0059, // ., value1, value2 -> ., result
-        MULx5A   		= 32'h005A, // ., value1, value2 -> ., result
-        DIVx5B   		= 32'h005B, // value1, value2 -> result
-        DIVUNx5C 		= 32'h005C, // value1, value2 -> result
-        REMx5D   		= 32'h005D, // ., value1, value2 -> ., result
-        REMUNx5E 		= 32'h005E, // ., value1, value2 -> ., result
-        ANDx5F   		= 32'h005F, // …, value1, value2 -> …, result
-        ORx60    		= 32'h0060, // ., value1, value2 -> ., result
-        XORx61   		= 32'h0061, // ., value1, value2 -> ., result
-        SHLx62   		= 32'h0062, // value, shiftAmount -> result
-        SHRx63   		= 32'h0063, // value, shiftAmount -> result
-        SHRUNx64 		= 32'h0064, // value, shiftAmount -> result    
-        NEGx65   		= 32'h0065, // ., value -> ., result
-        NOTx66   		= 32'h0066, // ., value -> ., result 
-        CONVI1x67		= 32'h0067, // value -> result
-        CONVI2x68		= 32'h0068, // value -> result
-        CONVI4x69		= 32'h0069, // value -> result
-        RETx2A   		= 32'h002A, // ?                  -> . (empty except for returned value)
-        CONVI8x6A		= 32'h006A, // value -> result
-        CONVR4x6B		= 32'h006B, // value -> result
-        CONVR8x6C		= 32'h006C, // value -> result
-        CONVU4x6D		= 32'h006D, // value -> result
-        CONVU8x6E		= 32'h006E, // value -> result
-        CONVRUNx76 		= 32'h0076, // value -> result
-        LDFLDx7B 		= 32'h007B, // ., obj             -> ., value
-        CONVOVFI1UNx82 	= 32'h0082, // value -> result
-        CONVOVFI2UNx83 	= 32'h0083, // value -> result
-        CONVOVFI4UNx84 	= 32'h0084, // value -> result
-        CONVOVFI8UNx85 	= 32'h0085, // value -> result
-        CONVOVFU1UNx86 	= 32'h0086, // value -> result
-        CONVOVFU2UNx87 	= 32'h0087, // value -> result
-        CONVOVFU4UNx88 	= 32'h0088, // value -> result
-        CONVOVFU8UNx89 	= 32'h0089, // value -> result
-        CONVOVFIUNx8A 	= 32'h008A, // value -> result
-        CONVOVFUUNx8B 	= 32'h008B, // value -> result
-        CONVOVFI1xB3 	= 32'h00B3, // value -> result
-        CONVOVFU1xB4 	= 32'h00B4, // value -> result
-        CONVOVFI2xB5 	= 32'h00B5, // value -> result
-        CONVOVFU2xB6 	= 32'h00B6, // value -> result
-        CONVOVFI4xB7 	= 32'h00B7, // value -> result
-        CONVOVFI8xB9 	= 32'h00B9, // value -> result
-        CONVOVFI2xBA 	= 32'h00BA, // value -> result
-        CKFINITExC3  	= 32'h00C3, // value -> value
-        CONVU2xD1 		= 32'h00D1, // value -> result
-        CONVU1xD2 		= 32'h00D2, // value -> result
-        CONVIxD3  		= 32'h00D3, // value -> result
-        CONVOVFUxD5 	= 32'h00D5, // value -> result
-        ADDOVFxD6 		= 32'h00D6, // …, value1, value2 -> …, result
-        ADDOVFUNxD7		= 32'h00D7, // …, value1, value2 -> …, result
-        MULOVFxD8 		= 32'h00D8, // ., value1, value2 -> ., result
-        MULOVFUNxD9 	= 32'h00D9, // ., value1, value2 -> ., result
-        SUBOVFxDA 		= 32'h00DA, // ., value1, value2 -> ., result
-        SUBOVFUNxDB 	= 32'h00DB, // ., value1, value2 -> ., result
-        ENDFAULTxDC 	= 32'h00DC, // -> 
-        //ENDFINALLYxDC = 32'h00DC, // -> 
-        LEAVExDD 		= 32'h00DD, // . ->
-        LEAVESxDE 		= 32'h00DE, // . ->
-        STINDIxDF 		= 32'h00DF, // ., addr, val -> .
-        CONVUxE0   		= 32'h00E0, // value -> result
-        CEQxFE01  		= 32'hFE01,  // value1, value2 -> result
-        ARGLISTxFE00	= 32'hFE00, // -> argListHandle
-        CGTxFE02   		= 32'hFE02, // value1, value2 -> result
-        CGTUNxFE03 		= 32'hFE03, // value1, value2 -> result
-        CLTxFE04   		= 32'hFE04, // value1, value2 -> result
-        CLTUNxFE05 		= 32'hFE05, // value1, value2 -> result
-        LDFTNxFE06 		= 32'hFE06, // -> ftn
-        LDARGxFE09 		= 32'hFE09, // -> value
-        LDARGAxFE0A 	= 32'hFE0A, // -> -> address of argument number argNum
-        STARGxFE0B 		= 32'hFE0B, // ., value -> ., 
-        ENDFILTERxFE11	= 32'hFE11, // value ->
-        CPBLKxFE17 		= 32'hFE17, // destaddr, srcaddr, size -> 
-        INITBLKxFE18 	= 32'hFE18, // addr, value, size -> 
-        LDLOCxFE0C 		= 32'hFE0C, // -> value
-        LDLOCAxFE0D 	= 32'hFE0D, // -> address
-        STLOCxFE0E 		= 32'hFE0E, // z                  -> .
-        LOCALLOCxFE0F 	= 32'hFE0F, // size -> address  
+        LDARGSx0E      = 32'h000E, // -> value
+        LDARGASx0F     = 32'h000F, // -> -> address of argument number argNum
+        LDCI4x20       = 32'h0020, // -> num
+        LDCI8x21       = 32'h0021, // -> num
+        LDCR4x22       = 32'h0022, // -> num
+        LDCR8x23       = 32'h0023, // -> num
+        DUPx25         = 32'h0025, // value -> value, value
+        POPx26         = 32'h0026, // ., value -> .
+        JMPx27         = 32'h0027, // ->
+        CALLx28        = 32'h0028, // ?                  -> .
+        CALLIx29       = 32'h0029, // arg0, arg1, . , argn, ftn -> retVal (sometimes)
+        //RETx2A       = 32'h002A, // -> (???)
+        BRSx2B         = 32'h002B, // ->
+        BRFALSESx2C    = 32'h002C, // value ->
+        BRTRUESx2D     = 32'h002D, // value ->
+        BEQSx2E        = 32'h002E, // value1, value2 ->
+        BGESx2F        = 32'h002F, // value1, value2 ->
+        BGTSx30        = 32'h0030, // value1, value2 ->
+        BLESx31        = 32'h0031, // value1, value2 ->
+        BLTSx32        = 32'h0032, // value1, value2 ->
+        BNEUNSx33      = 32'h0033, // value1, value2 ->
+        BGEUNSx34      = 32'h0034, // value1, value2 ->
+        BGTUNSx35      = 32'h0035, // value1, value2 ->
+        BLEUNSx36      = 32'h0036, // value1, value2 ->
+        BLTUNSx37      = 32'h0037, // value1, value2 ->
+        BRx38          = 32'h0038, // ?                  -> ?
+        BRFALSEx39     = 32'h0039, // value ->
+        BRTRUEx3A      = 32'h003A, // value ->
+        //BRINSTx3A    = 32'h003A, // value ->
+        BEQx3B         = 32'h003B, // value1, value2 ->
+        BGEx3C         = 32'h003C, // value1, value2 ->
+        //BGTx3D       = 32'h002E, // value1, value2 ->
+        BLEx3E         = 32'h003E, // value1, value2 ->
+        BLTx3F         = 32'h003F, // ?                  -> ?
+        BNEUNx40       = 32'h0040, // value1, value2 ->
+        BGEUNx41       = 32'h0041, // value1, value2 ->
+        BGTUNx42       = 32'h0042, // value1, value2 ->
+        BLEUNx43       = 32'h0043, // value1, value2 -> 
+        BLTUNx44       = 32'h0044, // value1, value2 ->
+        SWITCHx45      = 32'h0045, // ., value -> .
+        LDINDI1x46     = 32'h0046, // addr -> value
+        LDINDU1x47     = 32'h0047, // addr -> value
+        LDINDI2x48     = 32'h0048, // addr -> value
+        LDINDU2x49     = 32'h0049, // addr -> value
+        LDINDI4x4A     = 32'h004A, // addr -> value
+        LDINDU4x4B     = 32'h004B, // addr -> value
+        LDINDI8x4C     = 32'h004C, // addr -> value
+        //LDINDU8x4C   = 32'h004C, // addr -> value
+        LDINDIx4D      = 32'h004D, // addr -> value
+        LDINDR4x4E     = 32'h004E, // addr -> value
+        LDINDR8x4F     = 32'h004F, // addr -> value
+        LDINDREFx50    = 32'h0050, // addr -> value
+        STINDREFx51    = 32'h0051, // ., addr, val -> .
+        STNDI1x52      = 32'h0052, // ., addr, val -> .
+        STINDI2x53     = 32'h0053, // ., addr, val -> .
+        STINDI4x54     = 32'h0054, // ., addr, val -> .
+        STINDI8x55     = 32'h0055, // ., addr, val -> .
+        STINDR4x56     = 32'h0056, // ., addr, val -> .
+        STINDR8x57     = 32'h0057, // ., addr, val -> .
+        ADDx58         = 32'h0058, // x,y -> z
+        SUBx59         = 32'h0059, // ., value1, value2 -> ., result
+        MULx5A         = 32'h005A, // ., value1, value2 -> ., result
+        DIVx5B         = 32'h005B, // value1, value2 -> result
+        DIVUNx5C       = 32'h005C, // value1, value2 -> result
+        REMx5D         = 32'h005D, // ., value1, value2 -> ., result
+        REMUNx5E       = 32'h005E, // ., value1, value2 -> ., result
+        ANDx5F         = 32'h005F, // ?, value1, value2 -> ?, result
+        ORx60          = 32'h0060, // ., value1, value2 -> ., result
+        XORx61         = 32'h0061, // ., value1, value2 -> ., result
+        SHLx62         = 32'h0062, // value, shiftAmount -> result
+        SHRx63         = 32'h0063, // value, shiftAmount -> result
+        SHRUNx64       = 32'h0064, // value, shiftAmount -> result    
+        NEGx65         = 32'h0065, // ., value -> ., result
+        NOTx66         = 32'h0066, // ., value -> ., result 
+        CONVI1x67      = 32'h0067, // value -> result
+        CONVI2x68      = 32'h0068, // value -> result
+        CONVI4x69      = 32'h0069, // value -> result
+        RETx2A         = 32'h002A, // ?                  -> . (empty except for returned value)
+        CONVI8x6A      = 32'h006A, // value -> result
+        CONVR4x6B      = 32'h006B, // value -> result
+        CONVR8x6C      = 32'h006C, // value -> result
+        CONVU4x6D      = 32'h006D, // value -> result
+        CONVU8x6E      = 32'h006E, // value -> result
+        CONVRUNx76     = 32'h0076, // value -> result
+        LDFLDx7B       = 32'h007B, // ., obj             -> ., value
+        CONVOVFI1UNx82 = 32'h0082, // value -> result
+        CONVOVFI2UNx83 = 32'h0083, // value -> result
+        CONVOVFI4UNx84 = 32'h0084, // value -> result
+        CONVOVFI8UNx85 = 32'h0085, // value -> result
+        CONVOVFU1UNx86 = 32'h0086, // value -> result
+        CONVOVFU2UNx87 = 32'h0087, // value -> result
+        CONVOVFU4UNx88 = 32'h0088, // value -> result
+        CONVOVFU8UNx89 = 32'h0089, // value -> result
+        CONVOVFIUNx8A  = 32'h008A, // value -> result
+        CONVOVFUUNx8B  = 32'h008B, // value -> result
+        CONVOVFI1xB3   = 32'h00B3, // value -> result
+        CONVOVFU1xB4   = 32'h00B4, // value -> result
+        CONVOVFI2xB5   = 32'h00B5, // value -> result
+        CONVOVFU2xB6   = 32'h00B6, // value -> result
+        CONVOVFI4xB7   = 32'h00B7, // value -> result
+        CONVOVFI8xB9   = 32'h00B9, // value -> result
+        CONVOVFI2xBA   = 32'h00BA, // value -> result
+        CKFINITExC3    = 32'h00C3, // value -> value
+        CONVU2xD1      = 32'h00D1, // value -> result
+        CONVU1xD2      = 32'h00D2, // value -> result
+        CONVIxD3       = 32'h00D3, // value -> result
+        CONVOVFUxD5    = 32'h00D5, // value -> result
+        ADDOVFxD6      = 32'h00D6, // ?, value1, value2 -> ?, result
+        ADDOVFUNxD7    = 32'h00D7, // ?, value1, value2 -> ?, result
+        MULOVFxD8      = 32'h00D8, // ., value1, value2 -> ., result
+        MULOVFUNxD9    = 32'h00D9, // ., value1, value2 -> ., result
+        SUBOVFxDA      = 32'h00DA, // ., value1, value2 -> ., result
+        SUBOVFUNxDB    = 32'h00DB, // ., value1, value2 -> ., result
+        ENDFAULTxDC    = 32'h00DC, // -> 
+        //ENDFINALLYxDC= 32'h00DC, // -> 
+        LEAVExDD       = 32'h00DD, // . ->
+        LEAVESxDE      = 32'h00DE, // . ->
+        STINDIxDF      = 32'h00DF, // ., addr, val -> .
+        CONVUxE0       = 32'h00E0, // value -> result
+        CEQxFE01       = 32'hFE01,  // value1, value2 -> result
+        ARGLISTxFE00   = 32'hFE00, // -> argListHandle
+        CGTxFE02       = 32'hFE02, // value1, value2 -> result
+        CGTUNxFE03     = 32'hFE03, // value1, value2 -> result
+        CLTxFE04       = 32'hFE04, // value1, value2 -> result
+        CLTUNxFE05     = 32'hFE05, // value1, value2 -> result
+        LDFTNxFE06     = 32'hFE06, // -> ftn
+        LDARGxFE09     = 32'hFE09, // -> value
+        LDARGAxFE0A    = 32'hFE0A, // -> -> address of argument number argNum
+        STARGxFE0B     = 32'hFE0B, // ., value -> ., 
+        ENDFILTERxFE11 = 32'hFE11, // value ->
+        CPBLKxFE17     = 32'hFE17, // destaddr, srcaddr, size -> 
+        INITBLKxFE18   = 32'hFE18, // addr, value, size -> 
+        LDLOCxFE0C     = 32'hFE0C, // -> value
+        LDLOCAxFE0D    = 32'hFE0D, // -> address
+        STLOCxFE0E     = 32'hFE0E, // z                  -> .
+        LOCALLOCxFE0F  = 32'hFE0F, // size -> address  
         // OBJECT MODEL INSTRUCTIONS
-        CALLVIRTx6F 	= 32'h006F, // ., obj, arg, ., argN -> ., returnVal (not always returned)
-        CPOBJx70 		= 32'h0070, // ., dest, src -> ., 
-        LDOBJx71 		= 32'h0071, // ., src -> ., val
-        LDSTRx72 		= 32'h0072, // ., -> ., string
-        NEWOBJx73  		= 32'h0073, // …, arg1, … argN    -> …, obj
-        CASTCLASSx74 	= 32'h0074, // ., obj -> ., obj2
-        LDSFLDx7E 		= 32'h007E, // ., -> ., value
-        LDSFLDAx7F 		= 32'h007F, // ., -> ., address
-        BOXx8C 			= 32'h008C, // ., val -> ., obj
-        ISINSTx75 		= 32'h0075, // ., obj -> ., result
-        UNBOXx79 		= 32'h0079, // ., obj -> ., valueTypePtr
-        THROWx7A 		= 32'h007A, // ., object -> .,
-        //LDFLDx7B 		= 32'h007B, // ., obj -> ., value
-        LDFLDAx7C 		= 32'h007C, // ., obj -> ., address
-        STFLDx7D   		= 32'h007D, // ., obj, val -> .
-        STSFLDx80 		= 32'h0080, // ., val -> .
-        STOBJx81 		= 32'h0081, // ., dest, src -> .,
-        NEWARRx8D 		= 32'h008D, // ., numElems -> ., array
-        LDLENx8E 		= 32'h008E, // ., array -> ., length
-        LDELEMAx8F 		= 32'h008F, // ., array, index -> ., value
-        LDELEMI1x90 	= 32'h0090, // ., array, index -> ., value
-        LDELEMU1x91 	= 32'h0091, // ., array, index -> ., value
-        LDELEMI2x92 	= 32'h0092, // ., array, index -> ., value
-        LDELEMU2x93 	= 32'h0093, // ., array, index -> ., value
-        LDELEMI4x94 	= 32'h0094, // ., array, index -> ., value
-        LDELEMU4x95 	= 32'h0095, // ., array, index -> ., value
-        LDELEMI8x96 	= 32'h0096, // ., array, index -> ., value
-        //LDELEMU8x96 	= 32'h0096, // ., array, index -> ., value
-        LDELEMIx97 		= 32'h0097, // ., array, index -> ., value
-        LDELEMR4x98 	= 32'h0098, // ., array, index -> ., value
-        LDELEMR8x99 	= 32'h0099, // ., array, index -> ., value
-        LDELEMREFx9A 	= 32'h009A, // ., array, index -> ., value
-        STELEMIx9B 		= 32'h009B, // ., array, index, value -> ., 
-        STELEMI1x9C 	= 32'h009C, // ., array, index, value -> ., 
-        STELEMI2x9D 	= 32'h009D, // ., array, index, value -> ., 
-        STELEMI4x9E 	= 32'h009E, // ., array, index, value -> ., 
-        STELEMR4xA0 	= 32'h00A0, // ., array, index, value -> .,
-        STELEMR8xA1 	= 32'h00A1, // ., array, index, value -> .,  
-        STELEMREFxA2 	= 32'h00A2, // ., array, index, value -> ., 
-        LDELEMxA3 		= 32'h00A3, // ., array, index -> ., value
-        STELEMxA4 		= 32'h00A4, // ., array, index, value -> .
-        UNBOXANYxA5 	= 32'h00A5, // ., obj -> ., value or obj
-        REFANYVALxC2 	= 32'h00C2, // ., TypedRef -> ., address
-        MKREFANYxC6 	= 32'h00C6, // ., ptr -> ., typedRef
-        LDTOKENxD0 		= 32'h00D0, // ., -> ., RuntimeHandle
-        LDVIRTFNxFE07 	= 32'hFE07, // ., object -> ., ftn
-        INITOBJxFE15 	= 32'hFE15, // ., dest -> ., 
-        RETHROWxFE1A 	= 32'hFE1A, // ., -> ., 
-        SIZEOFxFE1C 	= 32'hFE1C, // ., -> ., size (4 bytes, unsigned)
-        REFANYTYPExFE1D = 32'hFE1D // ., TypedRef -> ., type        
+        CALLVIRTx6F    = 32'h006F, // ., obj, arg, ., argN -> ., returnVal (not always returned)
+        CPOBJx70       = 32'h0070, // ., dest, src -> ., 
+        LDOBJx71       = 32'h0071, // ., src -> ., val
+        LDSTRx72       = 32'h0072, // ., -> ., string
+        NEWOBJx73      = 32'h0073, // ?, arg1, ? argN    -> ?, obj
+        CASTCLASSx74   = 32'h0074, // ., obj -> ., obj2
+        LDSFLDx7E      = 32'h007E, // ., -> ., value
+        LDSFLDAx7F     = 32'h007F, // ., -> ., address
+        BOXx8C         = 32'h008C, // ., val -> ., obj
+        ISINSTx75      = 32'h0075, // ., obj -> ., result
+        UNBOXx79       = 32'h0079, // ., obj -> ., valueTypePtr
+        THROWx7A       = 32'h007A, // ., object -> .,
+        //LDFLDx7B     = 32'h007B, // ., obj -> ., value
+        LDFLDAx7C      = 32'h007C, // ., obj -> ., address
+        STFLDx7D       = 32'h007D, // ., obj, val -> .
+        STSFLDx80      = 32'h0080, // ., val -> .
+        STOBJx81       = 32'h0081, // ., dest, src -> .,
+        NEWARRx8D      = 32'h008D, // ., numElems -> ., array
+        LDLENx8E       = 32'h008E, // ., array -> ., length
+        LDELEMAx8F     = 32'h008F, // ., array, index -> ., value
+        LDELEMI1x90    = 32'h0090, // ., array, index -> ., value
+        LDELEMU1x91    = 32'h0091, // ., array, index -> ., value
+        LDELEMI2x92    = 32'h0092, // ., array, index -> ., value
+        LDELEMU2x93    = 32'h0093, // ., array, index -> ., value
+        LDELEMI4x94    = 32'h0094, // ., array, index -> ., value
+        LDELEMU4x95    = 32'h0095, // ., array, index -> ., value
+        LDELEMI8x96    = 32'h0096, // ., array, index -> ., value
+        //LDELEMU8x96  = 32'h0096, // ., array, index -> ., value
+        LDELEMIx97     = 32'h0097, // ., array, index -> ., value
+        LDELEMR4x98    = 32'h0098, // ., array, index -> ., value
+        LDELEMR8x99    = 32'h0099, // ., array, index -> ., value
+        LDELEMREFx9A   = 32'h009A, // ., array, index -> ., value
+        STELEMIx9B     = 32'h009B, // ., array, index, value -> ., 
+        STELEMI1x9C    = 32'h009C, // ., array, index, value -> ., 
+        STELEMI2x9D    = 32'h009D, // ., array, index, value -> ., 
+        STELEMI4x9E    = 32'h009E, // ., array, index, value -> ., 
+        STELEMR4xA0    = 32'h00A0, // ., array, index, value -> .,
+        STELEMR8xA1    = 32'h00A1, // ., array, index, value -> .,  
+        STELEMREFxA2   = 32'h00A2, // ., array, index, value -> ., 
+        LDELEMxA3      = 32'h00A3, // ., array, index -> ., value
+        STELEMxA4      = 32'h00A4, // ., array, index, value -> .
+        UNBOXANYxA5    = 32'h00A5, // ., obj -> ., value or obj
+        REFANYVALxC2   = 32'h00C2, // ., TypedRef -> ., address
+        MKREFANYxC6    = 32'h00C6, // ., ptr -> ., typedRef
+        LDTOKENxD0     = 32'h00D0, // ., -> ., RuntimeHandle
+        LDVIRTFNxFE07  = 32'hFE07, // ., object -> ., ftn
+        INITOBJxFE15   = 32'hFE15, // ., dest -> ., 
+        RETHROWxFE1A   = 32'hFE1A, // ., -> ., 
+        SIZEOFxFE1C    = 32'hFE1C, // ., -> ., size (4 bytes, unsigned)
+        REFANYTYPExFE1D= 32'hFE1D // ., TypedRef -> ., type        
     } CILOP;
-	
+   
+//temp
+    // stack: slots, pointers, stack frame information
+    typedef struct {
+        // Id of owner method
+        logic [31:0] SF_MIT_ID;       // 32'h00
+        // Instance id (if not static => 0)
+        logic [31:0] SF_THIS_ID;      // 32'h01
+        // Class id of owner class      
+        logic [31:0] SF_CIT_ID;       // 32'h02
+        // Number of arguments to method (fixed to 4)
+        logic [31:0] SF_ARGS;         // 32'h03
+        // Number of local variables in method (fixed to 4)
+        logic [31:0] SF_LOCS;         // 32'h04
+        // Link register: Address (index to an CIL record entry) of caller's next cil instruction
+        logic [31:0] SF_LR;           // 32'h05   
+        // Fixed args and locals to 4 + 4
+        logic [31:0] SF_ARG_0;        // 32'h06
+        logic [31:0] SF_ARG_1;        // 32'h07
+        logic [31:0] SF_ARG_2;        // 32'h08
+        logic [31:0] SF_ARG_3;        // 32'h09
+        logic [31:0] SF_LOC_0;        // 32'h0A
+        logic [31:0] SF_LOC_1;        // 32'h0B
+        logic [31:0] SF_LOC_2;        // 32'h0C
+        logic [31:0] SF_LOC_3;        // 32'h0D
+        // Stack frame size (based on the above slots)
+        logic [31:0] SF_SIZE;         // 32'h0E
+        // stack slots
+        logic [31:0] slot[0:255];
+        // stack state
+        logic [31:0] sfp;
+        logic [31:0] nsfp;
+        logic [31:0] mit_id;          // Current mit_id. Matches stack.sfp.SF_MIT_ID
+        logic [31:0] pc;              // Program counter
+        logic [31:0] lr;              // Link register. Matches previous stack frame (the next CIL to be executed)
+    } stack_t;  
+    
+    stack_t stack;
+ 
+ 
     ///////////////////////////////////////////////////////////////////////////
     //  COMPILE-TIME INFORMATION TABLES (e.g. mem.sv)
-	///////////////////////////////////////////////////////////////////////////
-	
+    ///////////////////////////////////////////////////////////////////////////
+    
     struct {
         // Class information table 
-        logic [31:0] cit                 [0:127];  // class information table
-        logic [31:0] CIT_ID              = 32'h00; // Class id
-        logic [31:0] CIT_NUMFIELDS       = 32'h01; // Number of fields
-        logic [31:0] CIT_NUMMETHODS      = 32'h02; // Number of metods
-        logic [31:0] CIT_SIZE            = 32'h03; // Number of entries
+        logic [31:0] cit [0:127];       // Class information table
+        logic [31:0] CIT_ID;            // Class id
+        logic [31:0] CIT_NUMFIELDS;     // Number of fields
+        logic [31:0] CIT_NUMMETHODS;    // Number of metods
+        logic [31:0] CIT_SIZE;          // Number of entries
         
         // Class field information table
-        logic [31:0] fit                 [0:127];  // field information table
-        logic [31:0] FIT_ID              = 32'h00; // Field id
-        logic [31:0] FIT_FIELDTYPE       = 32'h01; // Field type
-        logic [31:0] FIT_SIZE            = 32'h02; // Number of FIT entries
+        logic [31:0] fit [0:127];       // Field information table
+        logic [31:0] FIT_ID;            // Field id
+        logic [31:0] FIT_FIELDTYPE;     // Field type
+        logic [31:0] FIT_SIZE;          // Number of FIT entries
         
         // Method information table
-        logic [31:0] mit                 [0:127];  // method information table
-        logic [31:0] MIT_ID              = 32'h00; // Method id
-        logic [31:0] MIT_CIT_ID          = 32'h01; // Foreign key to CIT_ID (the class owning the method)
-        logic [31:0] MIT_NUMARGS         = 32'h02; // Number of arguments
-        logic [31:0] MIT_NUMLOCALS       = 32'h03; // Number of locals
-        logic [31:0] MIT_MAXEVALSTACK    = 32'h04; // Max. eval. stack
-        logic [31:0] MIT_NUMCIL          = 32'h05; // Num. CIL of instruc.
-        logic [31:0] MIT_FIRSTCIL        = 32'h06; // First CIL record index for this particular method
-        logic [31:0] MIT_SIZE            = 32'h07; // Size of one method entry record
-        logic [8*20:1] mit_names         [0:63];   // class:method names concatinated 
+        logic [31:0] mit [0:127];       // Method information table
+        logic [31:0] MIT_ID;            // Method id
+        logic [31:0] MIT_CIT_ID;        // Foreign key to CIT_ID (the class owning the method)
+        logic [31:0] MIT_NUMARGS;       // Number of arguments
+        logic [31:0] MIT_NUMLOCALS;     // Number of locals
+        logic [31:0] MIT_MAXEVALSTACK;  // Max. eval. stack
+        logic [31:0] MIT_NUMCIL;        // Num. CIL of instruc.
+        logic [31:0] MIT_FIRSTCIL;      // First CIL record index for this particular method
+        logic [31:0] MIT_SIZE;          // Size of one method entry record
+        logic [8*20:1] mit_names [0:63];// class:method names concatinated 
         
         // CIT_MIT_CIL: Class Method CIL Information Table
-        logic [31:0] cil                 [0:127];  // cil instructions information table
-        logic [31:0] CIL_ID              = 32'h00; // CIL id (per method)
-        logic [31:0] CIL_OPCODE          = 32'h01; // CIL opcode
-        logic [31:0] CIL_OPERAND         = 32'h02; // CIL opcode
-        logic [31:0] CIL_SIZE            = 32'h03; // Size of one cil entry record
-        logic [8*20:1] cil_names         [0:65535];// cil opnames
+        logic [31:0] cil [0:127];       // cil instructions information table
+        logic [31:0] CIL_ID;            // CIL id (per method)
+        logic [31:0] CIL_OPCODE;        // CIL opcode
+        logic [31:0] CIL_OPERAND;       // CIL opcode
+        logic [31:0] CIL_SIZE;          // Size of one cil entry record
+        logic [8*20:1] cil_names [0:65535];// cil opnames
     } tables;
     
     // "Read" memory files
     initial begin
-        `include "mem.sv"
+        // TABLE HELPER FIELDS from 'tables' struct
+        // Class information table 
+        tables.CIT_ID           <= 32'h00; // Class id
+        tables.CIT_NUMFIELDS    <= 32'h01; // Number of fields
+        tables.CIT_NUMMETHODS   <= 32'h02; // Number of metods
+        tables.CIT_SIZE         <= 32'h03; // Number of entries
+        // Class field information table
+        tables.FIT_ID           <= 32'h00; // Field id
+        tables.FIT_FIELDTYPE    <= 32'h01; // Field type
+        tables.FIT_SIZE         <= 32'h02; // Number of FIT entries
+        // Method information table
+        tables.MIT_ID           <= 32'h00; // Method id
+        tables.MIT_CIT_ID       <= 32'h01; // Foreign key to CIT_ID (the class owning the method)
+        tables.MIT_NUMARGS      <= 32'h02; // Number of arguments
+        tables.MIT_NUMLOCALS    <= 32'h03; // Number of locals
+        tables.MIT_MAXEVALSTACK <= 32'h04; // Max. eval. stack
+        tables.MIT_NUMCIL       <= 32'h05; // Num. CIL of instruc.
+        tables.MIT_FIRSTCIL     <= 32'h06; // First CIL record index for this particular method
+        tables.MIT_SIZE         <= 32'h07; // Size of one method entry record
+        // CIT_MIT_CIL: Class Method CIL Information Table
+        tables.CIL_ID           <= 32'h00; // CIL id (per method)
+        tables.CIL_OPCODE       <= 32'h01; // CIL opcode
+        tables.CIL_OPERAND      <= 32'h02; // CIL opcode
+        tables.CIL_SIZE         <= 32'h03; // Size of one cil entry record
+        
+        // PROGRAM LOADING    
+        //`include "mem.sv" // or load directly in test
         // cit records:         [0]CIT_ID
                              // [1]CIT_NUMFIELDS
                              // [2]CIT_NUMMETHODS
-        // tables.cit[0000] <= 32'h00000000;      // CIT_ID. NOTE: This used to be 2, which came from the assembler.
-        // tables.cit[0001] <= 32'h00000000;      // CIT_NUMFIELDS
-        // tables.cit[0002] <= 32'h00000004;      // CIT_NUMMETHODS
+        tables.cit[0000] <= 32'h00000000;      // CIT_ID. NOTE: This used to be 2, which came from the assembler.
+        tables.cit[0001] <= 32'h00000000;      // CIT_NUMFIELDS
+        tables.cit[0002] <= 32'h00000004;      // CIT_NUMMETHODS
         
         // --------------------------------------------------------------------------  
         // mit records are constant size
@@ -295,100 +360,100 @@ module fop
                          // [5]MIT_NUMCIL
                          // [6]MIT_FIRSTCIL: Points to the index in the cil table for the first CIL record for this method.
         // BasicClass:main
-        // tables.mit[0000] <= 32'h00000000;      // MIT_ID: Changed from 1 to 0 to give direct index multiplied with MIT_SIZE
-        // tables.mit[0001] <= 32'h00000000;      // MIT_CIT_ID (foreign key: index into cit[XX * CIT_SIZE])
-        // tables.mit[0002] <= 32'h00000000;      // MIT_NUMARGS
-        // tables.mit[0003] <= 32'h00000000;      // MIT_NUMLOCALS
-        // tables.mit[0004] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        // tables.mit[0005] <= 32'h00000006;      // MIT_NUMCIL
-        // tables.mit[0006] <= 32'h00000000;      // MIT_FIRSTCIL
+        tables.mit[0000] <= 32'h00000000;      // MIT_ID: Changed from 1 to 0 to give direct index multiplied with MIT_SIZE
+        tables.mit[0001] <= 32'h00000000;      // MIT_CIT_ID (foreign key: index into cit[XX * CIT_SIZE])
+        tables.mit[0002] <= 32'h00000000;      // MIT_NUMARGS
+        tables.mit[0003] <= 32'h00000000;      // MIT_NUMLOCALS
+        tables.mit[0004] <= 32'h00000008;      // MIT_MAXEVALSTACK
+        tables.mit[0005] <= 32'h00000006;      // MIT_NUMCIL
+        tables.mit[0006] <= 32'h00000000;      // MIT_FIRSTCIL
         // BasicClass:.ctor
-        // tables.mit[0007] <= 32'h00000001;      // MIT_ID
-        // tables.mit[0008] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
-        // tables.mit[0009] <= 32'h00000001;      // MIT_NUMARGS
-        // tables.mit[0010] <= 32'h00000000;      // MIT_NUMLOCALS
-        // tables.mit[0011] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        // tables.mit[0012] <= 32'h00000001;      // MIT_NUMCIL
-        // tables.mit[0013] <= 32'h00000012;      // MIT_FIRSTCIL
+        tables.mit[0007] <= 32'h00000001;      // MIT_ID
+        tables.mit[0008] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
+        tables.mit[0009] <= 32'h00000001;      // MIT_NUMARGS
+        tables.mit[0010] <= 32'h00000000;      // MIT_NUMLOCALS
+        tables.mit[0011] <= 32'h00000008;      // MIT_MAXEVALSTACK
+        tables.mit[0012] <= 32'h00000001;      // MIT_NUMCIL
+        tables.mit[0013] <= 32'h00000012;      // MIT_FIRSTCIL
         // BasicClass:Method1
-        // tables.mit[0014] <= 32'h00000002;      // MIT_ID
-        // tables.mit[0015] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
-        // tables.mit[0016] <= 32'h00000002;      // MIT_NUMARGS
-        // tables.mit[0017] <= 32'h00000002;      // MIT_NUMLOCALS
-        // tables.mit[0018] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        // tables.mit[0019] <= 32'h00000003;      // MIT_NUMCIL
-        // tables.mit[0020] <= 32'h00000015;      // MIT_FIRSTCIL
+        tables.mit[0014] <= 32'h00000002;      // MIT_ID
+        tables.mit[0015] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
+        tables.mit[0016] <= 32'h00000002;      // MIT_NUMARGS
+        tables.mit[0017] <= 32'h00000002;      // MIT_NUMLOCALS
+        tables.mit[0018] <= 32'h00000008;      // MIT_MAXEVALSTACK
+        tables.mit[0019] <= 32'h00000003;      // MIT_NUMCIL
+        tables.mit[0020] <= 32'h00000015;      // MIT_FIRSTCIL
         // BasicClass:Method2
-        // tables.mit[0021] <= 32'h00000003;      // MIT_ID
-        // tables.mit[0022] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
-        // tables.mit[0023] <= 32'h00000000;      // MIT_NUMARGS
-        // tables.mit[0024] <= 32'h00000001;      // MIT_NUMLOCALS
-        // tables.mit[0025] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        // tables.mit[0026] <= 32'h00000003;      // MIT_NUMCIL
-        // tables.mit[0027] <= 32'h0000001E;      // MIT_FIRSTCIL
+        tables.mit[0021] <= 32'h00000003;      // MIT_ID
+        tables.mit[0022] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
+        tables.mit[0023] <= 32'h00000000;      // MIT_NUMARGS
+        tables.mit[0024] <= 32'h00000001;      // MIT_NUMLOCALS
+        tables.mit[0025] <= 32'h00000008;      // MIT_MAXEVALSTACK
+        tables.mit[0026] <= 32'h00000003;      // MIT_NUMCIL
+        tables.mit[0027] <= 32'h0000001E;      // MIT_FIRSTCIL
         // mit names records:[0]MIT_ID_NAME
-        // tables.mit_names[00000000] <= "noname";                   // MIT_ID_NAME
-        // tables.mit_names[00000001] <= "BasicClass:main";          // MIT_ID_NAME
-        // tables.mit_names[00000002] <= "BasicClass:.ctor";         // MIT_ID_NAME
-        // tables.mit_names[00000003] <= "BasicClass:Method1";       // MIT_ID_NAME
-        // tables.mit_names[00000004] <= "BasicClass:Method2";       // MIT_ID_NAME
+        tables.mit_names[00000000] <= "noname";                   // MIT_ID_NAME
+        tables.mit_names[00000001] <= "BasicClass:main";          // MIT_ID_NAME
+        tables.mit_names[00000002] <= "BasicClass:.ctor";         // MIT_ID_NAME
+        tables.mit_names[00000003] <= "BasicClass:Method1";       // MIT_ID_NAME
+        tables.mit_names[00000004] <= "BasicClass:Method2";       // MIT_ID_NAME
         
         // --------------------------------------------------------------------------
         // cil records: [0]CIL_ID
                      // [1]CIL_OPCODE
                      // [2]CIL_OPERAND
         // BasicClass : main : rva 0x00000250
-        // tables.cil[0000] <= 32'h00000000;      // CIL_ID
-        // tables.cil[0001] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-        // tables.cil[0002] <= 32'h00000005;      // CIL_OPERAND:     5
+        tables.cil[0000] <= 32'h00000000;      // CIL_ID
+        tables.cil[0001] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
+        tables.cil[0002] <= 32'h00000005;      // CIL_OPERAND:     5
         // BasicClass : main : rva 0x00000250
-        // tables.cil[0003] <= 32'h00000001;      // CIL_ID
-        // tables.cil[0004] <= 32'h00000073;      // CIL_OPCODE:      newobj
-        // tables.cil[0005] <= 32'h06000002;      // CIL_OPERAND:     100663298
+        tables.cil[0003] <= 32'h00000001;      // CIL_ID
+        tables.cil[0004] <= 32'h00000073;      // CIL_OPCODE:      newobj
+        tables.cil[0005] <= 32'h06000002;      // CIL_OPERAND:     100663298
         // BasicClass : main : rva 0x00000250
-        // tables.cil[0006] <= 32'h00000002;      // CIL_ID
-        // tables.cil[0007] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-        // tables.cil[0008] <= 32'h0000000A;      // CIL_OPERAND:     10
+        tables.cil[0006] <= 32'h00000002;      // CIL_ID
+        tables.cil[0007] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
+        tables.cil[0008] <= 32'h0000000A;      // CIL_OPERAND:     10
         // BasicClass : main : rva 0x00000250
-        // tables.cil[0009] <= 32'h00000003;      // IL_ID
-        // tables.cil[0010] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-        // tables.cil[0011] <= 32'h00000014;      // CIL_OPERAND:     20
+        tables.cil[0009] <= 32'h00000003;      // IL_ID
+        tables.cil[0010] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
+        tables.cil[0011] <= 32'h00000014;      // CIL_OPERAND:     20
         // BasicClass : main : rva 0x00000250
-        // tables.cil[0012] <= 32'h00000004;      // CIL_ID
-        // tables.cil[0013] <= 32'h00000028;      // CIL_OPCODE:      call
-        // tables.cil[0014] <= 32'h06000003;      // CIL_OPERAND:     100663299
+        tables.cil[0012] <= 32'h00000004;      // CIL_ID
+        tables.cil[0013] <= 32'h00000028;      // CIL_OPCODE:      call
+        tables.cil[0014] <= 32'h06000003;      // CIL_OPERAND:     100663299
         // BasicClass : main : rva 0x00000250
-        // tables.cil[0015] <= 32'h00000005;      // CIL_ID
-        // tables.cil[0016] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        // tables.cil[0017] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0015] <= 32'h00000005;      // CIL_ID
+        tables.cil[0016] <= 32'h0000002A;      // CIL_OPCODE:      ret
+        tables.cil[0017] <= 32'h00000000;      // CIL_OPERAND:     0
         // BasicClass : .ctor : rva 0x0000026b
-        // tables.cil[0018] <= 32'h00000006;      // CIL_ID
-        // tables.cil[0019] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        // tables.cil[0020] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0018] <= 32'h00000006;      // CIL_ID
+        tables.cil[0019] <= 32'h0000002A;      // CIL_OPCODE:      ret
+        tables.cil[0020] <= 32'h00000000;      // CIL_OPERAND:     0
         // BasicClass : Method1 : rva 0x00000270
-        // tables.cil[0021] <= 32'h00000007;      // CIL_ID
-        // tables.cil[0022] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
-        // tables.cil[0023] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0021] <= 32'h00000007;      // CIL_ID
+        tables.cil[0022] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
+        tables.cil[0023] <= 32'h00000000;      // CIL_OPERAND:     0
         // BasicClass : Method1 : rva 0x00000270
-        // tables.cil[0024] <= 32'h00000008;      // CIL_ID
-        // tables.cil[0025] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
-        // tables.cil[0026] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0024] <= 32'h00000008;      // CIL_ID
+        tables.cil[0025] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
+        tables.cil[0026] <= 32'h00000000;      // CIL_OPERAND:     0
         // BasicClass : Method1 : rva 0x00000270
-        // tables.cil[0027] <= 32'h00000009;      // CIL_ID
-        // tables.cil[0028] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        // tables.cil[0029] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0027] <= 32'h00000009;      // CIL_ID
+        tables.cil[0028] <= 32'h0000002A;      // CIL_OPCODE:      ret
+        tables.cil[0029] <= 32'h00000000;      // CIL_OPERAND:     0
         // BasicClass : Method2 : rva 0x00000280
-        // tables.cil[0030] <= 32'h0000000A;      // CIL_ID
-        // tables.cil[0031] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
-        // tables.cil[0032] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0030] <= 32'h0000000A;      // CIL_ID
+        tables.cil[0031] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
+        tables.cil[0032] <= 32'h00000000;      // CIL_OPERAND:     0
         // BasicClass : Method2 : rva 0x00000280
-        // tables.cil[0033] <= 32'h0000000B;      // CIL_ID
-        // tables.cil[0034] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
-        // tables.cil[0035] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0033] <= 32'h0000000B;      // CIL_ID
+        tables.cil[0034] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
+        tables.cil[0035] <= 32'h00000000;      // CIL_OPERAND:     0
         // BasicClass : Method2 : rva 0x00000280
-        // tables.cil[0036] <= 32'h0000000C;      // CIL_ID
-        // tables.cil[0037] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        // tables.cil[0038] <= 32'h00000000;      // CIL_OPERAND:     0
+        tables.cil[0036] <= 32'h0000000C;      // CIL_ID
+        tables.cil[0037] <= 32'h0000002A;      // CIL_OPCODE:      ret
+        tables.cil[0038] <= 32'h00000000;      // CIL_OPERAND:     0
     end   
 
     initial begin
@@ -611,85 +676,57 @@ module fop
         tables.cil_names[16'hFE1D] <= "REFANYTYPExFE1D"; // FE1D
     end
     
-	///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
     // RUNTIME STRUCTS
-	///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
            
     // heap: slots, heap frame pointer, and combined static frame info/instance frame info.
     struct {
         // Set to 0 for static heap frames
-        logic [31:0] HF_THIS_ID  = 32'h00;
-     	// Heap frame record definition
-        logic [31:0] HF_CIT_ID   = 32'h01;
+        logic [31:0] HF_THIS_ID;//  = 32'h00;
+        // Heap frame record definition
+        logic [31:0] HF_CIT_ID;//   = 32'h01;
         // Fixed static or instance fields to 4
-        logic [31:0] HF_FLD_0    = 32'h02; 
-        logic [31:0] HF_FLD_1    = 32'h03; 
-        logic [31:0] HF_FLD_2    = 32'h04; 
-        logic [31:0] HF_FLD_3    = 32'h05; 
-		logic [31:0] HF_SIZE     = 32'h06;
-		// heap slots
+        logic [31:0] HF_FLD_0;//    = 32'h02; 
+        logic [31:0] HF_FLD_1;//    = 32'h03; 
+        logic [31:0] HF_FLD_2;//    = 32'h04; 
+        logic [31:0] HF_FLD_3;//    = 32'h05; 
+        logic [31:0] HF_SIZE;//     = 32'h06;
+        // heap slots
         logic [31:0] slot[0:127];
-		// heap state
+        // heap state
         logic [31:0] hfp;
-		logic [31:0] nhfp;
-		logic [31:0] cit_id; // Current cit_id. Matches heap.hfp.HF_CIT_ID and stack.sfp.SF_CIT_ID
+        logic [31:0] nhfp;
+        logic [31:0] cit_id; // Current cit_id. Matches heap.hfp.HF_CIT_ID and stack.sfp.SF_CIT_ID
         logic [31:0] this_id;   // Current this.   Matches heap.hfp.HF_THIS and stack.sfp.SF_THIS  
     } heap;
 
-    // stack: slots, pointers, stack frame information
-    struct {
-        // Id of owner method
-        logic [31:0] SF_MIT_ID    = 32'h00;
-        // Instance id (if not static => 0)
-        logic [31:0] SF_THIS_ID   = 32'h01;
-        // Class id of owner class      
-        logic [31:0] SF_CIT_ID    = 32'h02;
-        // Number of arguments to method (fixed to 4)
-        logic [31:0] SF_ARGS      = 32'h03;
-        // Number of local variables in method (fixed to 4)
-        logic [31:0] SF_LOCS      = 32'h04;
-        // Link register: Address (index to an CIL record entry) of caller's next cil instruction
-        logic [31:0] SF_LR        = 32'h05;     
-        // Fixed args and locals to 4 + 4
-        logic [31:0] SF_ARG_0     = 32'h06;
-        logic [31:0] SF_ARG_1     = 32'h07;
-        logic [31:0] SF_ARG_2     = 32'h08;
-        logic [31:0] SF_ARG_3     = 32'h09;
-        logic [31:0] SF_LOC_0     = 32'h0A;
-        logic [31:0] SF_LOC_1     = 32'h0B;
-        logic [31:0] SF_LOC_2     = 32'h0C;
-        logic [31:0] SF_LOC_3     = 32'h0D;
-        // Stack frame size (based on the above slots)
-        logic [31:0] SF_SIZE      = 32'h0E;
-		// stack slots
-        logic [31:0] slot[0:255];
-		// stack state
-        logic [31:0] sfp;
-		logic [31:0] nsfp;
-		logic [31:0] mit_id; // Current mit_id. Matches stack.sfp.SF_MIT_ID
-		logic [31:0] pc;     // Program counter
-		logic [31:0] lr;     // Link register. Matches previous stack frame (the next CIL to be executed)
-    } stack;
+//stack was here
 
     // evalstack: slots and eval stack pointer
     struct {
         // evaluation stack
         logic [31:0] slot[0:127];
-		// eval stack state
+        // eval stack state
         logic [31:0] esp; // Points to top of the evaluation stack
     } evalstack;
 
     //==32-bit TEXT constants==
     struct {
-        logic [31:0] THIS_74_68_69_73         = 32'h74_68_69_73;           
-        logic [31:0] NSF_6E_73_66_5F          = 32'h6E_73_66_5F;      
+        logic [31:0] THIS_74_68_69_73;//          = 32'h74_68_69_73;           
+        logic [31:0] NSF_6E_73_66_5F; //          = 32'h6E_73_66_5F;      
     } text;
     
-	///////////////////////////////////////////////////////////////////////////
-	// EXECUTION 
-	///////////////////////////////////////////////////////////////////////////
-	
-	// main loop
+    initial begin
+      text.THIS_74_68_69_73 <= 32'h74_68_69_73;
+      text.NSF_6E_73_66_5F  <= 32'h6E_73_66_5F;
+    end
+    
+    ///////////////////////////////////////////////////////////////////////////
+    // EXECUTION 
+    ///////////////////////////////////////////////////////////////////////////
+    
+    // main loop
     always_ff @(posedge clk) begin
         $display("////////////////////////////////////////////////////////////////////////////////");
         $display("%0d is current time in main loop", $time);
@@ -704,270 +741,270 @@ module fop
                 cilSwitch();
              end 
     end
-	
-	// Called from main loop
-	// Using: stack.pc
-	task cilSwitch();
-	    begin
-			$display("cilSwitch():");
-			$display("Decoding: pc=0x%02x", stack.pc);
-			 
-			// Take the opcode from current instruction
-			case (tables.cil[stack.pc + 32'h1])
-			    //==BASIC TASKS==                     
-			    NOPx00           : NOPx00_task();
-				BREAKx01         : BREAKx01_task();
-				LDARG0x02        : LDARG0x02_task();
-				LDARG1x03        : LDARG1x03_task();
-				LDARG2x04        : LDARG2x04_task();
-				LDARG3x05        : LDARG3x05_task();
-				LDLOC0x06        : LDLOC0x06_task();
-				LDLOC1x07        : LDLOC1x07_task();
-				LDLOC2x08        : LDLOC2x08_task();
-				LDLOC3x09        : LDLOC3x09_task();
-				STLOC0x0A        : STLOC0x0A_task();
-				STLOC1x0B        : STLOC1x0B_task();
-				STLOC2x0C        : STLOC2x0C_task();
-				STLOC3x0D        : STLOC3x0D_task();
-				STARGSx10        : STARGSx10_task(tables.cil[stack.pc + 8'h2]);
-				LDLOCSx11        : LDLOCSx11_task(tables.cil[stack.pc + 8'h2]);
-				LDLOCASx12       : LDLOCASx12_task(tables.cil[stack.pc + 8'h2]);
-				STLOCSx13        : STLOCSx13_task(tables.cil[stack.pc + 8'h2]);
-				LDNULLx14        : LDNULLx14_task();
-				LDCI4M1x15       : LDCI4M1x15_task();
-				LDCI40x16        : LDCI40x16_task();
-				LDCI41x17        : LDCI41x17_task();
-				LDCI42x18        : LDCI42x18_task();
-				LDCI43x19        : LDCI43x19_task();
-				LDCI44x1A        : LDCI44x1A_task();
-				LDCI45x1B        : LDCI45x1B_task();
-				LDCI46x1C        : LDCI46x1C_task();
-				LDCI47x1D        : LDCI47x1D_task();
-				LDCI48x1E        : LDCI48x1E_task();
-				LDCI44Sx1F       : LDCI44Sx1F_task(tables.cil[stack.pc + 8'h2]);
-				LDARGSx0E        : LDARGSx0E_task(tables.cil[stack.pc + 8'h2]);
-				LDARGASx0F       : LDARGASx0F_task(tables.cil[stack.pc + 8'h2]);
-				LDCI4x20         : LDCI4x20_task(tables.cil[stack.pc + 8'h2]); 
-				LDCI8x21         : LDCI8x21_task(tables.cil[stack.pc + 8'h2]);
-				LDCR4x22         : LDCR4x22_task(tables.cil[stack.pc + 8'h2]);
-				LDCR8x23         : LDCR8x23_task(tables.cil[stack.pc + 8'h2]);
-				DUPx25           : DUPx25_task();
-				POPx26           : POPx26_task();
-				JMPx27           : JMPx27_task(tables.cil[stack.pc + 8'h2]);
-				CALLx28          : CALLx28_task(tables.cil[stack.pc + 8'h2]);
-				CALLIx29         : CALLIx29_task(tables.cil[stack.pc + 8'h2]);
-				RETx2A           : RETx2A_task();
-				BRSx2B           : BRSx2B_task(tables.cil[stack.pc + 8'h2]);
-				BRFALSESx2C      : BRFALSESx2C_task(tables.cil[stack.pc + 8'h2]);
-				BRTRUESx2D       : BRTRUESx2D_task(tables.cil[stack.pc + 8'h2]);
-				BEQSx2E          : BEQSx2E_task(tables.cil[stack.pc + 8'h2]);
-				BGESx2F          : BGESx2F_task(tables.cil[stack.pc + 8'h2]);
-				BGTSx30          : BGTSx30_task(tables.cil[stack.pc + 8'h2]);
-				BLESx31          : BLESx31_task(tables.cil[stack.pc + 8'h2]);
-				BLTSx32          : BLTSx32_task(tables.cil[stack.pc + 8'h2]);
-				BNEUNSx33        : BNEUNSx33_task(tables.cil[stack.pc + 8'h2]);
-				BGEUNSx34        : BGEUNSx34_task(tables.cil[stack.pc + 8'h2]);
-				BGTUNSx35        : BGTUNSx35_task(tables.cil[stack.pc + 8'h2]);
-				BLEUNSx36        : BLEUNSx36_task(tables.cil[stack.pc + 8'h2]);
-				BLTUNSx37        : BLTUNSx37_task(tables.cil[stack.pc + 8'h2]);
-				BRx38            : BRx38_task(tables.cil[stack.pc + 8'h2]); 
-				BRFALSEx39       : BRFALSEx39_task(tables.cil[stack.pc + 8'h2]);
-				BRTRUEx3A        : BRTRUEx3A_task(tables.cil[stack.pc + 8'h2]);
-				//BRINSTx3A      : BRINSTx3A_task(cit_mit_cil[pc + 8'h2]);
-				BEQx3B           : BEQx3B_task(tables.cil[stack.pc + 8'h2]);
-				BGEx3C           : BGEx3C_task(tables.cil[stack.pc + 8'h2]);
-				//BGTx3D           : BGTx3D_task(cit_mit_cil[pc+8'h2]);
-				BLEx3E           : BLEx3E_task(tables.cil[stack.pc + 8'h2]);
-				BLTx3F           : BLTx3F_task(tables.cil[stack.pc + 8'h2]);
-				BNEUNx40         : BNEUNx40_task(tables.cil[stack.pc + 8'h2]);
-				BGEUNx41         : BGEUNx41_task(tables.cil[stack.pc + 8'h2]);
-				BGTUNx42         : BGTUNx42_task(tables.cil[stack.pc + 8'h2]);
-				BLEUNx43         : BLEUNx43_task(tables.cil[stack.pc + 8'h2]);
-				BLTUNx44         : BLTUNx44_task(tables.cil[stack.pc + 8'h2]);
-				SWITCHx45        : SWITCHx45_task();
-				LDINDI1x46       : LDINDI1x46_task(tables.cil[stack.pc + 8'h2]);
-				LDINDU1x47       : LDINDU1x47_task(tables.cil[stack.pc + 8'h2]);
-				LDINDI2x48       : LDINDI2x48_task(tables.cil[stack.pc + 8'h2]);
-				LDINDU2x49       : LDINDU2x49_task(tables.cil[stack.pc + 8'h2]);
-				LDINDI4x4A       : LDINDI4x4A_task(tables.cil[stack.pc + 8'h2]);
-				LDINDU4x4B       : LDINDU4x4B_task(tables.cil[stack.pc + 8'h2]);
-				LDINDI8x4C       : LDINDI8x4C_task(tables.cil[stack.pc + 8'h2]);
-				//LDINDU8x4C     : LDINDU8x4C_task(cit_mit_cil[pc + 8'h2]);
-				LDINDIx4D        : LDINDIx4D_task(tables.cil[stack.pc + 8'h2]);
-				LDINDR4x4E       : LDINDR4x4E_task(tables.cil[stack.pc + 8'h2]);
-				LDINDR8x4F       : LDINDR8x4F_task(tables.cil[stack.pc + 8'h2]);
-				LDINDREFx50      : LDINDREFx50_task(tables.cil[stack.pc + 8'h2]);
-				STINDREFx51      : STINDREFx51_task(tables.cil[stack.pc + 8'h2]);
-				STNDI1x52        : STNDI1x52_task(tables.cil[stack.pc + 8'h2]);
-				STINDI2x53       : STINDI2x53_task(tables.cil[stack.pc + 8'h2]);
-				STINDI4x54       : STINDI4x54_task(tables.cil[stack.pc + 8'h2]);
-				STINDI8x55       : STINDI8x55_task(tables.cil[stack.pc + 8'h2]);
-				STINDR4x56       : STINDR4x56_task(tables.cil[stack.pc + 8'h2]);
-				STINDR8x57       : STINDR8x57_task(tables.cil[stack.pc + 8'h2]);
-				ADDx58           : ADDx58_task(1'b0);
-				SUBx59           : SUBx59_task();
-				MULx5A           : MULx5A_task();
-				DIVx5B           : DIVx5B_task();
-				DIVUNx5C         : DIVUNx5C_task();
-				REMx5D           : REMx5D_task();
-				REMUNx5E         : REMUNx5E_task();
-				ANDx5F           : ANDx5F_task();
-				ORx60            : ORx60_task();
-				XORx61           : XORx61_task();
-				SHLx62           : SHLx62_task();
-				SHRx63           : SHRx63_task();
-				SHRUNx64         : SHRUNx64_task();
-				NEGx65           : NEGx65_task();
-				NOTx66           : NOTx66_task();
-				CONVI1x67        : CONVI1x67_task();
-				CONVI2x68        : CONVI2x68_task();
-				CONVI4x69        : CONVI4x69_task();
-				CONVI8x6A        : CONVI8x6A_task();
-				CONVR4x6B        : CONVR4x6B_task();
-				CONVR8x6C        : CONVR8x6C_task();
-				CONVU4x6D        : CONVU4x6D_task();
-				CONVU8x6E        : CONVU8x6E_task();
-				CONVRUNx76       : CONVRUNx76_task(); 
-				LDFLDx7B         : LDFLDx7B_task(tables.cil[stack.pc + 8'h2]); // field index/token
-				CONVOVFI1UNx82   : CONVOVFI1UNx82_task();
-				CONVOVFI2UNx83   : CONVOVFI2UNx83_task();
-				CONVOVFI4UNx84   : CONVOVFI4UNx84_task();
-				CONVOVFI8UNx85   : CONVOVFI8UNx85_task();
-				CONVOVFU1UNx86   : CONVOVFU1UNx86_task();
-				CONVOVFU2UNx87   : CONVOVFU2UNx87_task();
-				CONVOVFU4UNx88   : CONVOVFU4UNx88_task();
-				CONVOVFU8UNx89   : CONVOVFU8UNx89_task();
-				CONVOVFIUNx8A    : CONVOVFIUNx8A_task();
-				CONVOVFUUNx8B    : CONVOVFUUNx8B_task();
-				CONVOVFI1xB3     : CONVOVFI1xB3_task();
-				CONVOVFU1xB4     : CONVOVFU1xB4_task();
-				CONVOVFI2xB5     : CONVOVFI2xB5_task();
-				CONVOVFU2xB6     : CONVOVFU2xB6_task();
-				CONVOVFI4xB7     : CONVOVFI4xB7_task();
-				CONVOVFI8xB9     : CONVOVFI8xB9_task();
-				CONVOVFI2xBA     : CONVOVFI2xBA_task();
-				CKFINITExC3      : CKFINITExC3_task();
-				CONVU2xD1        : CONVU2xD1_task();
-				CONVU1xD2        : CONVU1xD2_task();
-				CONVIxD3         : CONVIxD3_task();
-				CONVOVFUxD5      : CONVOVFUxD5_task();
-				ADDOVFxD6        : ADDOVFxD6_task(tables.cil[stack.pc + 8'h2]);
-				ADDOVFUNxD7      : ADDOVFUNxD7_task(tables.cil[stack.pc + 8'h2]);
-				MULOVFxD8        : MULOVFxD8_task();
-				MULOVFUNxD9      : MULOVFUNxD9_task();
-				SUBOVFxDA        : SUBOVFxDA_task();
-				SUBOVFUNxDB      : SUBOVFUNxDB_task();
-				ENDFAULTxDC      : ENDFAULTxDC_task();
-				//ENDFINALLYxDC    : ENDFINALLYxDC_task();
-				LEAVExDD         : LEAVExDD_task(tables.cil[stack.pc + 8'h2]);
-				LEAVESxDE        : LEAVESxDE_task(tables.cil[stack.pc + 8'h2]);
-				STINDIxDF        : STINDIxDF_task();
-				CONVUxE0         : CONVUxE0_task();
-				CEQxFE01         : CEQxFE01_task();
-				ARGLISTxFE00     : ARGLISTxFE00_task();
-				CGTxFE02         : CGTxFE02_task();
-				CGTUNxFE03       : CGTUNxFE03_task();
-				CLTxFE04         : CLTxFE04_task();
-				CLTUNxFE05       : CLTUNxFE05_task();
-				LDFTNxFE06       : LDFTNxFE06_task();
-				LDARGxFE09       : LDARGxFE09_task(tables.cil[stack.pc + 8'h2]);
-				LDARGAxFE0A      : LDARGAxFE0A_task(tables.cil[stack.pc + 8'h2]);
-				STARGxFE0B       : STARGxFE0B_task(tables.cil[stack.pc + 8'h2]);
-				ENDFILTERxFE11   : ENDFILTERxFE11_task();
-				CPBLKxFE17       : CPBLKxFE17_task();
-				INITBLKxFE18     : INITBLKxFE18_task();
-				LDLOCxFE0C       : LDLOCxFE0C_task(tables.cil[stack.pc + 8'h2]);
-				LDLOCAxFE0D      : LDLOCAxFE0D_task(tables.cil[stack.pc + 8'h2]);
-				STLOCxFE0E       : STLOCxFE0E_task(tables.cil[stack.pc + 8'h2]);
-				LOCALLOCxFE0F    : LOCALLOCxFE0F_task();
-				//==OBJECT TASKS==
-				CALLVIRTx6F      : CALLVIRTx6F_task(tables.cil[stack.pc + 8'h2]);
-				CPOBJx70         : CPOBJx70_task();
-				LDOBJx71         : LDOBJx71_task();
-				LDSTRx72         : LDSTRx72_task();
-				NEWOBJx73        : NEWOBJx73_task(tables.cil[stack.pc + 8'h2]); // ctor token: methodref or methoddef
-				CASTCLASSx74     : CASTCLASSx74_task();
-				LDSFLDx7E        : LDSFLDx7E_task(tables.cil[stack.pc + 8'h2]);
-				LDSFLDAx7F       : LDSFLDAx7F_task(tables.cil[stack.pc + 8'h2]);
-				BOXx8C           : BOXx8C_task();
-				ISINSTx75        : ISINSTx75_task(tables.cil[stack.pc + 8'h2]);
-				UNBOXx79         : UNBOXx79_task();
-				THROWx7A         : THROWx7A_task();
-				//LDFLDx7B       : LDFLDx7B_task();
-				LDFLDAx7C        : LDFLDAx7C_task(tables.cil[stack.pc + 8'h2]);
-				STFLDx7D         : STFLDx7D_task(tables.cil[stack.pc + 8'h2]); // field index/token
-				STSFLDx80        : STSFLDx80_task(tables.cil[stack.pc + 8'h2]);
-				STOBJx81         : STOBJx81_task(tables.cil[stack.pc + 8'h2]);
-				NEWARRx8D        : NEWARRx8D_task(tables.cil[stack.pc + 8'h2]);
-				LDLENx8E         : LDLENx8E_task();
-				//LDELEMAx8F     : LDELEMAx8F_task(cil[stack.pc + 8'h2]);
-				LDELEMI1x90      : LDELEMI1x90_task();
-				LDELEMU1x91      : LDELEMU1x91_task();
-				LDELEMI2x92      : LDELEMI2x92_task();
-				LDELEMU2x93      : LDELEMU2x93_task();
-				LDELEMI4x94      : LDELEMI4x94_task();
-				LDELEMU4x95      : LDELEMU4x95_task();
-				LDELEMI8x96      : LDELEMI8x96_task();
-				//LDELEMU8x96    : LDELEMU8x96_task();
-				LDELEMIx97       : LDELEMIx97_task();
-				LDELEMR4x98      : LDELEMR4x98_task();
-				LDELEMR8x99      : LDELEMR8x99_task();
-				LDELEMREFx9A     : LDELEMREFx9A_task();
-				STELEMIx9B       : STELEMIx9B_task();
-				STELEMI1x9C      : STELEMI1x9C_task();
-				STELEMI2x9D      : STELEMI2x9D_task();
-				STELEMI4x9E      : STELEMI4x9E_task();
-				STELEMR4xA0      : STELEMR4xA0_task();
-				STELEMR8xA1      : STELEMR8xA1_task();
-				STELEMREFxA2     : STELEMREFxA2_task();
-				LDELEMxA3        : LDELEMxA3_task();
-				STELEMxA4        : STELEMxA4_task();
-				UNBOXANYxA5      : UNBOXANYxA5_task();
-				REFANYVALxC2     : REFANYVALxC2_task(tables.cil[stack.pc + 8'h2]);
-				MKREFANYxC6      : MKREFANYxC6_task(tables.cil[stack.pc + 8'h2]);
-				LDTOKENxD0       : LDTOKENxD0_task(tables.cil[stack.pc + 8'h2]);
-				LDVIRTFNxFE07    : LDVIRTFNxFE07_task(tables.cil[stack.pc + 8'h2]);
-				INITOBJxFE15     : INITOBJxFE15_task();
-				RETHROWxFE1A     : RETHROWxFE1A_task();
-				SIZEOFxFE1C      : SIZEOFxFE1C_task(tables.cil[stack.pc + 8'h2]);
-				REFANYTYPExFE1D  : REFANYTYPExFE1D_task();                     
-				default decodeError();
-			 endcase    
-		end
-	endtask
+    
+    // Called from main loop
+    // Using: stack.pc
+    task cilSwitch();
+        begin
+            $display("cilSwitch():");
+            $display("Decoding: pc=0x%02x", stack.pc);
+             
+            // Take the opcode from current instruction
+            unique case (tables.cil[stack.pc + 32'h1])
+                //==BASIC TASKS==                     
+                NOPx00           : NOPx00_task();
+                BREAKx01         : BREAKx01_task();
+                LDARG0x02        : LDARG0x02_task();
+                LDARG1x03        : LDARG1x03_task();
+                LDARG2x04        : LDARG2x04_task();
+                LDARG3x05        : LDARG3x05_task();
+                LDLOC0x06        : LDLOC0x06_task();
+                LDLOC1x07        : LDLOC1x07_task();
+                LDLOC2x08        : LDLOC2x08_task();
+                LDLOC3x09        : LDLOC3x09_task();
+                STLOC0x0A        : STLOC0x0A_task();
+                STLOC1x0B        : STLOC1x0B_task();
+                STLOC2x0C        : STLOC2x0C_task();
+                STLOC3x0D        : STLOC3x0D_task();
+                STARGSx10        : STARGSx10_task(tables.cil[stack.pc + 8'h2]);
+                LDLOCSx11        : LDLOCSx11_task(tables.cil[stack.pc + 8'h2]);
+                LDLOCASx12       : LDLOCASx12_task(tables.cil[stack.pc + 8'h2]);
+                STLOCSx13        : STLOCSx13_task(tables.cil[stack.pc + 8'h2]);
+                LDNULLx14        : LDNULLx14_task();
+                LDCI4M1x15       : LDCI4M1x15_task();
+                LDCI40x16        : LDCI40x16_task();
+                LDCI41x17        : LDCI41x17_task();
+                LDCI42x18        : LDCI42x18_task();
+                LDCI43x19        : LDCI43x19_task();
+                LDCI44x1A        : LDCI44x1A_task();
+                LDCI45x1B        : LDCI45x1B_task();
+                LDCI46x1C        : LDCI46x1C_task();
+                LDCI47x1D        : LDCI47x1D_task();
+                LDCI48x1E        : LDCI48x1E_task();
+                LDCI44Sx1F       : LDCI44Sx1F_task(tables.cil[stack.pc + 8'h2]);
+                LDARGSx0E        : LDARGSx0E_task(tables.cil[stack.pc + 8'h2]);
+                LDARGASx0F       : LDARGASx0F_task(tables.cil[stack.pc + 8'h2]);
+                LDCI4x20         : LDCI4x20_task(tables.cil[stack.pc + 8'h2]); 
+                LDCI8x21         : LDCI8x21_task(tables.cil[stack.pc + 8'h2]);
+                LDCR4x22         : LDCR4x22_task(tables.cil[stack.pc + 8'h2]);
+                LDCR8x23         : LDCR8x23_task(tables.cil[stack.pc + 8'h2]);
+                DUPx25           : DUPx25_task();
+                POPx26           : POPx26_task();
+                JMPx27           : JMPx27_task(tables.cil[stack.pc + 8'h2]);
+                CALLx28          : CALLx28_task(tables.cil[stack.pc + 8'h2]);
+                CALLIx29         : CALLIx29_task(tables.cil[stack.pc + 8'h2]);
+                RETx2A           : RETx2A_task();
+                BRSx2B           : BRSx2B_task(tables.cil[stack.pc + 8'h2]);
+                BRFALSESx2C      : BRFALSESx2C_task(tables.cil[stack.pc + 8'h2]);
+                BRTRUESx2D       : BRTRUESx2D_task(tables.cil[stack.pc + 8'h2]);
+                BEQSx2E          : BEQSx2E_task(tables.cil[stack.pc + 8'h2]);
+                BGESx2F          : BGESx2F_task(tables.cil[stack.pc + 8'h2]);
+                BGTSx30          : BGTSx30_task(tables.cil[stack.pc + 8'h2]);
+                BLESx31          : BLESx31_task(tables.cil[stack.pc + 8'h2]);
+                BLTSx32          : BLTSx32_task(tables.cil[stack.pc + 8'h2]);
+                BNEUNSx33        : BNEUNSx33_task(tables.cil[stack.pc + 8'h2]);
+                BGEUNSx34        : BGEUNSx34_task(tables.cil[stack.pc + 8'h2]);
+                BGTUNSx35        : BGTUNSx35_task(tables.cil[stack.pc + 8'h2]);
+                BLEUNSx36        : BLEUNSx36_task(tables.cil[stack.pc + 8'h2]);
+                BLTUNSx37        : BLTUNSx37_task(tables.cil[stack.pc + 8'h2]);
+                BRx38            : BRx38_task(tables.cil[stack.pc + 8'h2]); 
+                BRFALSEx39       : BRFALSEx39_task(tables.cil[stack.pc + 8'h2]);
+                BRTRUEx3A        : BRTRUEx3A_task(tables.cil[stack.pc + 8'h2]);
+                //BRINSTx3A      : BRINSTx3A_task(cit_mit_cil[pc + 8'h2]);
+                BEQx3B           : BEQx3B_task(tables.cil[stack.pc + 8'h2]);
+                BGEx3C           : BGEx3C_task(tables.cil[stack.pc + 8'h2]);
+                //BGTx3D           : BGTx3D_task(cit_mit_cil[pc+8'h2]);
+                BLEx3E           : BLEx3E_task(tables.cil[stack.pc + 8'h2]);
+                BLTx3F           : BLTx3F_task(tables.cil[stack.pc + 8'h2]);
+                BNEUNx40         : BNEUNx40_task(tables.cil[stack.pc + 8'h2]);
+                BGEUNx41         : BGEUNx41_task(tables.cil[stack.pc + 8'h2]);
+                BGTUNx42         : BGTUNx42_task(tables.cil[stack.pc + 8'h2]);
+                BLEUNx43         : BLEUNx43_task(tables.cil[stack.pc + 8'h2]);
+                BLTUNx44         : BLTUNx44_task(tables.cil[stack.pc + 8'h2]);
+                SWITCHx45        : SWITCHx45_task();
+                LDINDI1x46       : LDINDI1x46_task(tables.cil[stack.pc + 8'h2]);
+                LDINDU1x47       : LDINDU1x47_task(tables.cil[stack.pc + 8'h2]);
+                LDINDI2x48       : LDINDI2x48_task(tables.cil[stack.pc + 8'h2]);
+                LDINDU2x49       : LDINDU2x49_task(tables.cil[stack.pc + 8'h2]);
+                LDINDI4x4A       : LDINDI4x4A_task(tables.cil[stack.pc + 8'h2]);
+                LDINDU4x4B       : LDINDU4x4B_task(tables.cil[stack.pc + 8'h2]);
+                LDINDI8x4C       : LDINDI8x4C_task(tables.cil[stack.pc + 8'h2]);
+                //LDINDU8x4C     : LDINDU8x4C_task(cit_mit_cil[pc + 8'h2]);
+                LDINDIx4D        : LDINDIx4D_task(tables.cil[stack.pc + 8'h2]);
+                LDINDR4x4E       : LDINDR4x4E_task(tables.cil[stack.pc + 8'h2]);
+                LDINDR8x4F       : LDINDR8x4F_task(tables.cil[stack.pc + 8'h2]);
+                LDINDREFx50      : LDINDREFx50_task(tables.cil[stack.pc + 8'h2]);
+                STINDREFx51      : STINDREFx51_task(tables.cil[stack.pc + 8'h2]);
+                STNDI1x52        : STNDI1x52_task(tables.cil[stack.pc + 8'h2]);
+                STINDI2x53       : STINDI2x53_task(tables.cil[stack.pc + 8'h2]);
+                STINDI4x54       : STINDI4x54_task(tables.cil[stack.pc + 8'h2]);
+                STINDI8x55       : STINDI8x55_task(tables.cil[stack.pc + 8'h2]);
+                STINDR4x56       : STINDR4x56_task(tables.cil[stack.pc + 8'h2]);
+                STINDR8x57       : STINDR8x57_task(tables.cil[stack.pc + 8'h2]);
+                ADDx58           : ADDx58_task(1'b0);
+                SUBx59           : SUBx59_task();
+                MULx5A           : MULx5A_task();
+                DIVx5B           : DIVx5B_task();
+                DIVUNx5C         : DIVUNx5C_task();
+                REMx5D           : REMx5D_task();
+                REMUNx5E         : REMUNx5E_task();
+                ANDx5F           : ANDx5F_task();
+                ORx60            : ORx60_task();
+                XORx61           : XORx61_task();
+                SHLx62           : SHLx62_task();
+                SHRx63           : SHRx63_task();
+                SHRUNx64         : SHRUNx64_task();
+                NEGx65           : NEGx65_task();
+                NOTx66           : NOTx66_task();
+                CONVI1x67        : CONVI1x67_task();
+                CONVI2x68        : CONVI2x68_task();
+                CONVI4x69        : CONVI4x69_task();
+                CONVI8x6A        : CONVI8x6A_task();
+                CONVR4x6B        : CONVR4x6B_task();
+                CONVR8x6C        : CONVR8x6C_task();
+                CONVU4x6D        : CONVU4x6D_task();
+                CONVU8x6E        : CONVU8x6E_task();
+                CONVRUNx76       : CONVRUNx76_task(); 
+                LDFLDx7B         : LDFLDx7B_task(tables.cil[stack.pc + 8'h2]); // field index/token
+                CONVOVFI1UNx82   : CONVOVFI1UNx82_task();
+                CONVOVFI2UNx83   : CONVOVFI2UNx83_task();
+                CONVOVFI4UNx84   : CONVOVFI4UNx84_task();
+                CONVOVFI8UNx85   : CONVOVFI8UNx85_task();
+                CONVOVFU1UNx86   : CONVOVFU1UNx86_task();
+                CONVOVFU2UNx87   : CONVOVFU2UNx87_task();
+                CONVOVFU4UNx88   : CONVOVFU4UNx88_task();
+                CONVOVFU8UNx89   : CONVOVFU8UNx89_task();
+                CONVOVFIUNx8A    : CONVOVFIUNx8A_task();
+                CONVOVFUUNx8B    : CONVOVFUUNx8B_task();
+                CONVOVFI1xB3     : CONVOVFI1xB3_task();
+                CONVOVFU1xB4     : CONVOVFU1xB4_task();
+                CONVOVFI2xB5     : CONVOVFI2xB5_task();
+                CONVOVFU2xB6     : CONVOVFU2xB6_task();
+                CONVOVFI4xB7     : CONVOVFI4xB7_task();
+                CONVOVFI8xB9     : CONVOVFI8xB9_task();
+                CONVOVFI2xBA     : CONVOVFI2xBA_task();
+                CKFINITExC3      : CKFINITExC3_task();
+                CONVU2xD1        : CONVU2xD1_task();
+                CONVU1xD2        : CONVU1xD2_task();
+                CONVIxD3         : CONVIxD3_task();
+                CONVOVFUxD5      : CONVOVFUxD5_task();
+                ADDOVFxD6        : ADDOVFxD6_task(tables.cil[stack.pc + 8'h2]);
+                ADDOVFUNxD7      : ADDOVFUNxD7_task(tables.cil[stack.pc + 8'h2]);
+                MULOVFxD8        : MULOVFxD8_task();
+                MULOVFUNxD9      : MULOVFUNxD9_task();
+                SUBOVFxDA        : SUBOVFxDA_task();
+                SUBOVFUNxDB      : SUBOVFUNxDB_task();
+                ENDFAULTxDC      : ENDFAULTxDC_task();
+                //ENDFINALLYxDC    : ENDFINALLYxDC_task();
+                LEAVExDD         : LEAVExDD_task(tables.cil[stack.pc + 8'h2]);
+                LEAVESxDE        : LEAVESxDE_task(tables.cil[stack.pc + 8'h2]);
+                STINDIxDF        : STINDIxDF_task();
+                CONVUxE0         : CONVUxE0_task();
+                CEQxFE01         : CEQxFE01_task();
+                ARGLISTxFE00     : ARGLISTxFE00_task();
+                CGTxFE02         : CGTxFE02_task();
+                CGTUNxFE03       : CGTUNxFE03_task();
+                CLTxFE04         : CLTxFE04_task();
+                CLTUNxFE05       : CLTUNxFE05_task();
+                LDFTNxFE06       : LDFTNxFE06_task();
+                LDARGxFE09       : LDARGxFE09_task(tables.cil[stack.pc + 8'h2]);
+                LDARGAxFE0A      : LDARGAxFE0A_task(tables.cil[stack.pc + 8'h2]);
+                STARGxFE0B       : STARGxFE0B_task(tables.cil[stack.pc + 8'h2]);
+                ENDFILTERxFE11   : ENDFILTERxFE11_task();
+                CPBLKxFE17       : CPBLKxFE17_task();
+                INITBLKxFE18     : INITBLKxFE18_task();
+                LDLOCxFE0C       : LDLOCxFE0C_task(tables.cil[stack.pc + 8'h2]);
+                LDLOCAxFE0D      : LDLOCAxFE0D_task(tables.cil[stack.pc + 8'h2]);
+                STLOCxFE0E       : STLOCxFE0E_task(tables.cil[stack.pc + 8'h2]);
+                LOCALLOCxFE0F    : LOCALLOCxFE0F_task();
+                //==OBJECT TASKS==
+                CALLVIRTx6F      : CALLVIRTx6F_task(tables.cil[stack.pc + 8'h2]);
+                CPOBJx70         : CPOBJx70_task();
+                LDOBJx71         : LDOBJx71_task();
+                LDSTRx72         : LDSTRx72_task();
+                NEWOBJx73        : NEWOBJx73_task(tables.cil[stack.pc + 8'h2]); // ctor token: methodref or methoddef
+                CASTCLASSx74     : CASTCLASSx74_task();
+                LDSFLDx7E        : LDSFLDx7E_task(tables.cil[stack.pc + 8'h2]);
+                LDSFLDAx7F       : LDSFLDAx7F_task(tables.cil[stack.pc + 8'h2]);
+                BOXx8C           : BOXx8C_task();
+                ISINSTx75        : ISINSTx75_task(tables.cil[stack.pc + 8'h2]);
+                UNBOXx79         : UNBOXx79_task();
+                THROWx7A         : THROWx7A_task();
+                //LDFLDx7B       : LDFLDx7B_task();
+                LDFLDAx7C        : LDFLDAx7C_task(tables.cil[stack.pc + 8'h2]);
+                STFLDx7D         : STFLDx7D_task(tables.cil[stack.pc + 8'h2]); // field index/token
+                STSFLDx80        : STSFLDx80_task(tables.cil[stack.pc + 8'h2]);
+                STOBJx81         : STOBJx81_task(tables.cil[stack.pc + 8'h2]);
+                NEWARRx8D        : NEWARRx8D_task(tables.cil[stack.pc + 8'h2]);
+                LDLENx8E         : LDLENx8E_task();
+                //LDELEMAx8F     : LDELEMAx8F_task(cil[stack.pc + 8'h2]);
+                LDELEMI1x90      : LDELEMI1x90_task();
+                LDELEMU1x91      : LDELEMU1x91_task();
+                LDELEMI2x92      : LDELEMI2x92_task();
+                LDELEMU2x93      : LDELEMU2x93_task();
+                LDELEMI4x94      : LDELEMI4x94_task();
+                LDELEMU4x95      : LDELEMU4x95_task();
+                LDELEMI8x96      : LDELEMI8x96_task();
+                //LDELEMU8x96    : LDELEMU8x96_task();
+                LDELEMIx97       : LDELEMIx97_task();
+                LDELEMR4x98      : LDELEMR4x98_task();
+                LDELEMR8x99      : LDELEMR8x99_task();
+                LDELEMREFx9A     : LDELEMREFx9A_task();
+                STELEMIx9B       : STELEMIx9B_task();
+                STELEMI1x9C      : STELEMI1x9C_task();
+                STELEMI2x9D      : STELEMI2x9D_task();
+                STELEMI4x9E      : STELEMI4x9E_task();
+                STELEMR4xA0      : STELEMR4xA0_task();
+                STELEMR8xA1      : STELEMR8xA1_task();
+                STELEMREFxA2     : STELEMREFxA2_task();
+                LDELEMxA3        : LDELEMxA3_task();
+                STELEMxA4        : STELEMxA4_task();
+                UNBOXANYxA5      : UNBOXANYxA5_task();
+                REFANYVALxC2     : REFANYVALxC2_task(tables.cil[stack.pc + 8'h2]);
+                MKREFANYxC6      : MKREFANYxC6_task(tables.cil[stack.pc + 8'h2]);
+                LDTOKENxD0       : LDTOKENxD0_task(tables.cil[stack.pc + 8'h2]);
+                LDVIRTFNxFE07    : LDVIRTFNxFE07_task(tables.cil[stack.pc + 8'h2]);
+                INITOBJxFE15     : INITOBJxFE15_task();
+                RETHROWxFE1A     : RETHROWxFE1A_task();
+                SIZEOFxFE1C      : SIZEOFxFE1C_task(tables.cil[stack.pc + 8'h2]);
+                REFANYTYPExFE1D  : REFANYTYPExFE1D_task();                     
+                default decodeError();
+             endcase    
+        end
+    endtask
     
     // INITIALIZATION
     task initOnReset();
         begin
             $display("initOnReset()");
-			// Program state: pc init (points to first CIL instruction in cit_mit_cil)
-            stack.pc = 32'h0;
-			// The instruction after stack.pc for the calling method
-            stack.lr = 32'h0;
+            // Program state: pc init (points to first CIL instruction in cit_mit_cil)
+            stack.pc     <= 32'h0;
+            // The instruction after stack.pc for the calling method
+            stack.lr     <= 32'h0;
             // Set "current" instance to 0, but is it does not mean static
-			// Just mean that we have to add one to generate first instance id
-            heap.this_id = 32'h0;
-			
+            // Just mean that we have to add one to generate first instance id
+            heap.this_id <= 32'h0;
+            
             // stack init
-			stack.sfp     = 32'h0;
-			stack.nsfp    = 32'h0;
-            stack.slot[0] = 32'h73_66_70_5F; //"sfp_"
-			
+            stack.sfp     <= 32'h0;
+            stack.nsfp    <= 32'h0;
+            stack.slot[0] <= 32'h73_66_70_5F; //"sfp_"
+            
             // evaluation stack
-            evalstack.esp     = 32'h0;
-            evalstack.slot[0] = 32'h65_73_70_5F; //"esp_"
-			
+            evalstack.esp     <= 32'h0;
+            evalstack.slot[0] <= 32'h65_73_70_5F; //"esp_"
+            
             // heap init
-            heap.hfp = 32'h0;
-			heap.nhfp = 32'h0;
-            heap.slot[0] = 32'h68_70_5F_5F; //"hp__"
+            heap.hfp     <= 32'h0;
+            heap.nhfp    <= 32'h0;
+            heap.slot[0] <= 32'h68_70_5F_5F; //"hp__"
 
             // Create first (static) heap frame
-			// First cit is 0 and "this" is also 0
+            // First cit is 0 and "this" is also 0
             createHeapFrame(32'h0, 32'h0);
             
             // Create first static stack frame
-			// First (static) method is main which is mit_id 0 and "this" is also still 0
+            // First (static) method is main which is mit_id 0 and "this" is also still 0
             createStackFrame(32'h0, 32'h0);
         end
     endtask
@@ -976,30 +1013,30 @@ module fop
     // mitId is the method id, and "this" is the identifier for the new instance (or just 0 if it is a static method)
     task createStackFrame(input [31:0] mit_id, input [31:0] this_id);
         begin
-			stack.slot[stack.nsfp + stack.SF_MIT_ID] 	  = mit_id;
-            stack.slot[stack.nsfp + stack.SF_CIT_ID]	  = 32'h0; // Only one class so far
-            stack.slot[stack.nsfp + stack.SF_THIS_ID]     = this_id; // 0 if static method			
-            stack.slot[stack.nsfp + stack.SF_ARGS]        = 32'h4;   // 4 hardcoded
-            stack.slot[stack.nsfp + stack.SF_LOCS]        = 32'h4;   // 4 hardcoded
-            stack.slot[stack.nsfp + stack.SF_LR]          = stack.lr;
-            stack.slot[stack.nsfp + stack.SF_ARG_0]       = 32'h0;
-			stack.slot[stack.nsfp + stack.SF_ARG_1]       = 32'h0;			
-			stack.slot[stack.nsfp + stack.SF_ARG_2]       = 32'h0;			
-			stack.slot[stack.nsfp + stack.SF_ARG_3]       = 32'h0;			
-			stack.slot[stack.nsfp + stack.SF_LOC_0]       = 32'h0;			
-			stack.slot[stack.nsfp + stack.SF_LOC_1]       = 32'h0;			
-			stack.slot[stack.nsfp + stack.SF_LOC_2]       = 32'h0;			
-			stack.slot[stack.nsfp + stack.SF_LOC_3]       = 32'h0;			
+            stack.slot[stack.nsfp + stack.SF_MIT_ID]      <= mit_id;
+            stack.slot[stack.nsfp + stack.SF_CIT_ID]      <= 32'h0; // Only one class so far
+            stack.slot[stack.nsfp + stack.SF_THIS_ID]     <= this_id; // 0 if static method          
+            stack.slot[stack.nsfp + stack.SF_ARGS]        <= 32'h4;   // 4 hardcoded
+            stack.slot[stack.nsfp + stack.SF_LOCS]        <= 32'h4;   // 4 hardcoded
+            stack.slot[stack.nsfp + stack.SF_LR]          <= stack.lr;
+            stack.slot[stack.nsfp + stack.SF_ARG_0]       <= 32'h0;
+            stack.slot[stack.nsfp + stack.SF_ARG_1]       <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_ARG_2]       <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_ARG_3]       <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_0]       <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_1]       <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_2]       <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_3]       <= 32'h0;          
 
-     	    // Arguments slots
+            // Arguments slots
             copyWords(evalstack.esp, stack.nsfp, 32'h4);
             // Locals slots
             copyWords(evalstack.esp + 32'h4, stack.nsfp + 32'h4, 32'h4);
             // Increment stack frame pointers
-			stack.sfp = stack.nsfp;
-			stack.nsfp= stack.nsfp + stack.SF_SIZE;
-			// esp reset (but it is a full stack)
-            evalstack.esp = 32'h0;
+            stack.sfp     <= stack.nsfp;
+            stack.nsfp    <= stack.nsfp + stack.SF_SIZE;
+            // esp reset (but it is a full stack)
+            evalstack.esp <= 32'h0;
         end
     endtask    
 
@@ -1009,20 +1046,20 @@ module fop
         begin
         end
     endtask
-	
+    
     // Create heap frame for a static class or new instance/object
     // If this = 0, then it is a static class, otherwise an instance.
     task createHeapFrame(input [31:0] cit_id, input [31:0] this_id);
         begin
-            heap.slot[heap.nhfp + heap.HF_THIS_ID] 	= this_id; // 0 means static
-            heap.slot[heap.nhfp + heap.HF_CIT_ID] 	= cit_id; 
-            heap.slot[heap.nhfp + heap.HF_FLD_0] 	= 32'h0;
-			heap.slot[heap.nhfp + heap.HF_FLD_1] 	= 32'h0;
-			heap.slot[heap.nhfp + heap.HF_FLD_2] 	= 32'h0;
-			heap.slot[heap.nhfp + heap.HF_FLD_3] 	= 32'h0;
-			heap.hfp  = heap.nhfp;
-			heap.nhfp = heap.nhfp + heap.HF_SIZE;
-		end
+            heap.slot[heap.nhfp + heap.HF_THIS_ID]  <= this_id; // 0 means static
+            heap.slot[heap.nhfp + heap.HF_CIT_ID]   <= cit_id; 
+            heap.slot[heap.nhfp + heap.HF_FLD_0]    <= 32'h0;
+            heap.slot[heap.nhfp + heap.HF_FLD_1]    <= 32'h0;
+            heap.slot[heap.nhfp + heap.HF_FLD_2]    <= 32'h0;
+            heap.slot[heap.nhfp + heap.HF_FLD_3]    <= 32'h0;
+            heap.hfp  <= heap.nhfp;
+            heap.nhfp <= heap.nhfp + heap.HF_SIZE;
+        end
     endtask
     
     task showEvalStack();
@@ -1048,20 +1085,21 @@ module fop
         end
     endtask
     
-	task showStackFrame();
-	    begin
-		end
-	endtask
+    task showStackFrame();
+        begin
+        end
+    endtask
 
     task showHeapFrame();
-	    begin
-		end
-	endtask
-	
-	// Show the contents of the cit, mit, fit, etc. tables that were loaded (originally) from mem.sv
-	task showMemSv();
         begin
-		    $display("\nshowMemSv()");
+        end
+    endtask
+    
+    // Show the contents of the cit, mit, fit, etc. tables that were loaded (originally) from mem.sv
+    task showMemSv();
+        begin
+          `ifdef MODEL_TECH // Quartus can't synthesize the foreach statements (just needed for sim)
+            $display("\nshowMemSv()");
             foreach (tables.mit_names[i])
                 // Name and method for debugging
                 if (tables.mit_names[i] >= 0)
@@ -1069,7 +1107,7 @@ module fop
                 else
                     break;
             
-			$display("");
+            $display("");
             $display("cit records:         [0]CIT_ID");
             $display("                     [1]CIT_NUMFIELDS");
             $display("                     [2]CIT_NUMMETHODS");
@@ -1080,7 +1118,7 @@ module fop
                 else
                     break;
                     
-			$display("");		
+            $display("");       
             $display("mit records:         [0]MIT_ID");
             $display("                     [1]MIT_CIT_ID (foreign key)");
             $display("                     [2]MIT_NUMARGS");
@@ -1094,8 +1132,8 @@ module fop
                     $display("    mit[0x%4x] 0x%000008x", i, tables.mit[i]);
                 else
                     break;
-					
-			$display("");
+                    
+            $display("");
             $display("cil records:");
             $display("    [0]CIL_ID");
             $display("    [1]CIL_OPCODE");
@@ -1106,12 +1144,13 @@ module fop
                     $display("    cil[0x%4x] 0x%000008x", i, tables.cil[i]);
                 else
                     break;
+          `endif
         end
-    endtask		
-	
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// CIL TASKS	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
+    endtask     
+    
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // CIL TASKS    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
     //==BASE INSTRUCTIONS TASKS==
     // NOP
     task NOPx00_task();
@@ -1380,9 +1419,9 @@ module fop
         begin
            $display("LDCI4x20_task(input [31:0] in=0x%x), esp=0x%x", in, evalstack.esp);
            // push i4 value to new tos
-           evalstack.slot[evalstack.esp + 32'h1] = in;
+           evalstack.slot[evalstack.esp + 32'h1] <= in;
            // adjust esp (??? <=)
-           evalstack.esp = evalstack.esp + 32'h1;
+           evalstack.esp <= evalstack.esp + 32'h1;
            nextInstruction();
         end            
     endtask
@@ -2660,8 +2699,8 @@ module fop
             logic [31:0] mit_numlocals; // Number of locals
             $display("LDLOCxFE0C_task(input login [31:0] locIndx=%d), evalstack[esp=%d]=0x%x", locIndx, evalstack.esp, evalstack.slot[evalstack.esp]); 
             // The offset is also dependent on the number of arguments for this mid
-            mit_numargs = tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
-            mit_numlocals = tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
+            mit_numargs <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
+            mit_numlocals <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
             evalstack.slot[evalstack.esp + 32'h1] <= stack.slot[stack.sfp + stack.SF_SIZE + mit_numargs + locIndx] ;
             evalstack.esp <= evalstack.esp + 32'h1;
             nextInstruction();
@@ -2675,8 +2714,8 @@ module fop
             logic [31:0] mit_numlocals; // Number of locals
             $display("LDLOCAxFE0D_task(input login [31:0] locIndx=%d), evalstack[esp=%d]=0x%x", locIndx, evalstack.esp, evalstack.slot[evalstack.esp]);
             // The offset is also dependent on the number of arguments for this mid
-            mit_numargs = tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
-            mit_numlocals = tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
+            mit_numargs <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
+            mit_numlocals <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
             evalstack.slot[evalstack.esp + 32'h1] <= stack.sfp + stack.SF_SIZE + mit_numargs + locIndx;
             evalstack.esp <= evalstack.esp + 32'h1;
             nextInstruction();
@@ -2691,8 +2730,8 @@ module fop
            logic [31:0] mit_numlocals; // Number of locals
            $display("STLOCxFE0E_task(input login [31:0] locIndx=%d), evalstack[esp=%d]=0x%x", locIndx, evalstack.esp, evalstack.slot[evalstack.esp]); 
            // The offset is also dependent on the number of arguments for this mid
-           mit_numargs = tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
-           mit_numlocals = tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
+           mit_numargs <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
+           mit_numlocals <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
            stack.slot[stack.sfp + stack.SF_SIZE + mit_numargs + locIndx] <= evalstack.slot[evalstack.esp];
            evalstack.slot[evalstack.esp] <= 32'bx;
            evalstack.esp <= evalstack.esp - 32'h1;
@@ -2762,11 +2801,11 @@ module fop
             logic [31:0] citIdValue;
             // ctorToken = x06000002
             $display("NEWOBJx73(input [31:0] ctorToken=0x%08x)", ctorToken);
-            ctor_mit_id = (32'h00FFFFFF & ctorToken);
-            ctor_cit_id = tables.mit[ctor_mit_id * tables.MIT_SIZE + tables.MIT_CIT_ID];
+            ctor_mit_id <= (32'h00FFFFFF & ctorToken);
+            ctor_cit_id <= tables.mit[ctor_mit_id * tables.MIT_SIZE + tables.MIT_CIT_ID];
             
             // Create the new instance heap frame with incremented "this"
-            heap.this_id = heap.this_id + 32'h1;
+            heap.this_id <= heap.this_id + 32'h1;
             createHeapFrame(32'h0, heap.this_id);            
             
             // Create the stackframe for .ctor
@@ -2901,7 +2940,7 @@ module fop
         end
     endtask
     
-    // NEWARR: …, numElems -> …, array
+    // NEWARR: ?, numElems -> ?, array
     task NEWARRx8D_task(input [31:0] etype);
         begin
             $display("NEWARRx8D_task(etype=%d)", etype);
@@ -2920,7 +2959,7 @@ module fop
         end
     endtask
     
-    // LDELEMA: …, array, index -> …, addresseval
+    // LDELEMA: ?, array, index -> ?, addresseval
     task LDEMAx8F_task();
         begin
             $display("LDELEMAx8F_task()");
@@ -3029,7 +3068,7 @@ module fop
         end
      endtask
          
-    //evalstack.slot[evalstack.esp]array, index, value -> …,
+    //evalstack.slot[evalstack.esp]array, index, value -> ?,
     task STELEMIx9B_task();
         begin
             $display("STELEMIx9B_task()");
@@ -3114,7 +3153,7 @@ module fop
         end
     endtask
     
-    // REFANYVAL: …, TypedRef -> …, address
+    // REFANYVAL: ?, TypedRef -> ?, address
     task REFANYVALxC2_task(input [31:0] aType);
         begin
             $display("REFANYVALxC2_task()");
@@ -3123,7 +3162,7 @@ module fop
         end
     endtask
     
-    // MKREFANY: …, ptr -> …, typedRef
+    // MKREFANY: ?, ptr -> ?, typedRef
     task MKREFANYxC6_task(input [31:0] aClass);
         begin
             $display("MKREFANYxC6_task()");
@@ -3132,7 +3171,7 @@ module fop
         end
     endtask
     
-    // LDTOKEN: … -> …, RuntimeHandle
+    // LDTOKEN: ? -> ?, RuntimeHandle
     task LDTOKENxD0_task(input [31:0] aToken);
         begin
             $display("LDTOKENxD0_task()");
@@ -3142,7 +3181,7 @@ module fop
         end
     endtask
     
-    // LDVIRTFN: … object -> …, ftn
+    // LDVIRTFN: ? object -> ?, ftn
     task LDVIRTFNxFE07_task(input [31:0] aMethod);
         begin
             $display("LDVIRTFNxFE07_task()");
@@ -3167,7 +3206,7 @@ module fop
         end
     endtask
     
-    // SIZEOF: …, -> …, size (4 bytes, unsigned)
+    // SIZEOF: ?, -> ?, size (4 bytes, unsigned)
     task SIZEOFxFE1C_task(input [31:0] aTypeTok);
         begin
             $display("SIevalstack.slot[evalstack.esp]()");
@@ -3178,7 +3217,7 @@ module fop
         end
     endtask
     
-    // REFANYTYPE: …, TypedRef -> …, type
+    // REFANYTYPE: ?, TypedRef -> ?, type
     task REFANYTYPExFE1D_task();
         begin
             $display("REFANYTYPExFE1D_task()");
@@ -3196,7 +3235,7 @@ module fop
             $display("");
             //$display("nextInstruction(): cid=%0d, mid=%0d", heap.cit_id, cls.prevcid, cls.mid);
             //$display("                   old pc=0x%0x, new pc=0x%0x", stack.pc, stack.pc + tables.CIL_SIZE);
-            stack.pc = stack.pc + tables.CIL_SIZE;
+            stack.pc <= stack.pc + tables.CIL_SIZE;
         end
     endtask
     
@@ -3216,25 +3255,25 @@ module fop
             if(cnt == 1)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d]=0x%0x", fromEIndex, evalstack.slot[fromEIndex]);
-                    stack.slot[toSIndex] = evalstack.slot[fromEIndex];
+                    stack.slot[toSIndex] <= evalstack.slot[fromEIndex];
                 end 
                   
             if(cnt == 2)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d+32'h1]=0x%0x", fromEIndex, evalstack.slot[fromEIndex+32'h1]);
-                    stack.slot[toSIndex+32'h1] = evalstack.slot[fromEIndex+32'h1];
+                    stack.slot[toSIndex+32'h1] <= evalstack.slot[fromEIndex+32'h1];
                 end
               
             if(cnt == 3)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d+32'h2]=0x%0x", fromEIndex, evalstack.slot[fromEIndex+32'h2]);
-                    evalstack.slot[toSIndex+32'h2] = evalstack.slot[fromEIndex+32'h2];
+                    evalstack.slot[toSIndex+32'h2] <= evalstack.slot[fromEIndex+32'h2];
                 end
             
             if(cnt == 4)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d+32'h3]=0x%0x", fromEIndex, evalstack.slot[fromEIndex+32'h3]);
-                    evalstack.slot[toSIndex+32'h3] = evalstack.slot[fromEIndex+32'h3];
+                    evalstack.slot[toSIndex+32'h3] <= evalstack.slot[fromEIndex+32'h3];
                 end
         end
     endtask
@@ -3246,25 +3285,25 @@ module fop
          if(cnt == 1)
              begin
                  $display("Setting stack[startIndx=%d]=x%0x", startIndx, val);
-                 stack.slot[startIndx] = val;
+                 stack.slot[startIndx] <= val;
              end 
                
          if(cnt == 2)
              begin
                  $display("Setting stack[startIndx=%d]=0x%0x", startIndx+32'h1, val);
-                 stack.slot[startIndx+32'h1] = val;
+                 stack.slot[startIndx+32'h1] <= val;
              end
            
          if(cnt == 3)
              begin
                  $display("Setting stack[startIndx=%0d]=0x%0x", startIndx+32'h2, val);
-                 stack.slot[startIndx+32'h2] = val;
+                 stack.slot[startIndx+32'h2] <= val;
              end
          
          if(cnt == 4)
              begin
                  $display("Setting stack[startIndx=%0d]=0x%0x", startIndx+32'h3, val);
-                 stack.slot[startIndx+32'h3] = val;
+                 stack.slot[startIndx+32'h3] <= val;
              end
         end
     endtask
@@ -3825,7 +3864,7 @@ TODO
 //    parameter [31:0] DIVUNx5C = 32'h005C; // value1, value2 -> result
 //    parameter [31:0] REMx5D   = 32'h005D; // ., value1, value2 -> ., result
 //    parameter [31:0] REMUNx5E = 32'h005E; // ., value1, value2 -> ., result
-//    parameter [31:0] ANDx5F   = 32'h005F; // …, value1, value2 -> …, result
+//    parameter [31:0] ANDx5F   = 32'h005F; // ?, value1, value2 -> ?, result
 //    parameter [31:0] ORx60    = 32'h0060; // ., value1, value2 -> ., result
 //    parameter [31:0] XORx61   = 32'h0061; // ., value1, value2 -> ., result
 //    parameter [31:0] SHLx62   = 32'h0062; // value, shiftAmount -> result
@@ -3868,8 +3907,8 @@ TODO
 //    parameter [31:0] CONVU1xD2 = 32'h00D2; // value -> result
 //    parameter [31:0] CONVIxD3  = 32'h00D3; // value -> result
 //    parameter [31:0] CONVOVFUxD5 = 32'h00D5; // value -> result
-//    parameter [31:0] ADDOVFxD6 = 32'h00D6; // …, value1, value2 -> …, result
-//    parameter [31:0] ADDOVFUNxD7= 32'h00D7; // …, value1, value2 -> …, result
+//    parameter [31:0] ADDOVFxD6 = 32'h00D6; // ?, value1, value2 -> ?, result
+//    parameter [31:0] ADDOVFUNxD7= 32'h00D7; // ?, value1, value2 -> ?, result
 //    parameter [31:0] MULOVFxD8 = 32'h00D8; // ., value1, value2 -> ., result
 //    parameter [31:0] MULOVFUNxD9 = 32'h00D9; // ., value1, value2 -> ., result
 //    parameter [31:0] SUBOVFxDA = 32'h00DA; // ., value1, value2 -> ., result
@@ -3903,7 +3942,7 @@ TODO
 //    parameter [31:0] CPOBJx70 = 32'h0070; // ., dest, src -> ., 
 //    parameter [31:0] LDOBJx71 = 32'h0071; // ., src -> ., val
 //    parameter [31:0] LDSTRx72 = 32'h0072; // ., -> ., string
-//    parameter [31:0] NEWOBJx73  = 32'h0073; // …, arg1, … argN    -> …, obj
+//    parameter [31:0] NEWOBJx73  = 32'h0073; // ?, arg1, ? argN    -> ?, obj
 //    parameter [31:0] CASTCLASSx74 = 32'h0074; // ., obj -> ., obj2
 //    parameter [31:0] LDSFLDx7E = 32'h007E; // ., -> ., value
 //    parameter [31:0] LDSFLDAx7F = 32'h007F; // ., -> ., address
@@ -3984,10 +4023,10 @@ TODO
             // $display("cid=%0d, prevcid=%0d, mid=%0d, prevmid=%0d", cls.cid, cls.prevcid, cls.mid, cls.prevmid);
         // end
     // endtask
-	
-		// task showStackFrame();
-	    // begin
-			// $display("Stackframe setup:");
+    
+        // task showStackFrame();
+        // begin
+            // $display("Stackframe setup:");
             // $display("                                     --------------------------------------------------------");
             // $display("                   stack[0x%000008x] | lr                = 0x%000008x                       |", stack.sfp + stack.SF_LR_OFFSET, state.lr);
             // $display("                                     --------------------------------------------------------");          
@@ -4009,10 +4048,10 @@ TODO
             // $display(" sfp=0x%000008x -> stack[0x%000008x] | nsfp              = 0x%000008x                       |", stack.sfp, stack.sfp + stack.SF_NEXT_SF_OFFSET, stack.nsfp);
             // $display("                                     --------------------------------------------------------");  
             // $display(""); 
-		// end
-	// endtask
+        // end
+    // endtask
     //task showHeap();
-	  //  begin
+      //  begin
             // $display("Heapframe setup:");
             // $display("                                     --------------------------------------------------------");
             // $display("                    heap[0x%000008x] | citNumfieldsValue    = 0x%000008x                        |", heap.hfp + heap.HF_FLDS, citNumfieldsValue);
@@ -4023,9 +4062,9 @@ TODO
             // $display("hfp=0x%000008x ->   heap[0x%000008x] | citIdValue           = 0x%000008x                        |", heap.hfp, heap.hfp + heap.HF_CID_OFFSET, citIdValue);
             // $display("                                     --------------------------------------------------------");  
             // $display("");
-	//	end
-	//endtask
-	
+    //  end
+    //endtask
+    
         // Argument information table
         // logic [31:0] at                  [0:127];  // Argument information table 
         // logic [31:0] AT_ID               = 32'h00; // Argument id
@@ -4038,4 +4077,4 @@ TODO
         // logic [31:0] LT_TYPE             = 32'h01; // Local var. type
         // logic [31:0] LT_SIZE             = 32'h02; // Size of local entry record
         
-	
+    
