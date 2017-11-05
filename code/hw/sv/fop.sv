@@ -13,9 +13,9 @@ module fop
   input reset,
   input enable 
 );
-  timeunit 1ns; timeprecision 1ns;
+    timeunit 1ns; timeprecision 1ns;
           
-     enum logic [31:0] {
+    enum logic [31:0] {
         NOPx00         = 32'h0000, // ->
         BREAKx01       = 32'h0001, // ->
         LDARG0x02      = 32'h0002, // -> value
@@ -46,7 +46,6 @@ module fop
         LDCI47x1D      = 32'h001D, // -> num
         LDCI48x1E      = 32'h001E, // -> num
         LDCI44Sx1F     = 32'h001F, // -> num
-        
         LDARGSx0E      = 32'h000E, // -> value
         LDARGASx0F     = 32'h000F, // -> -> address of argument number argNum
         LDCI4x20       = 32'h0020, // -> num
@@ -124,7 +123,7 @@ module fop
         CONVI1x67      = 32'h0067, // value -> result
         CONVI2x68      = 32'h0068, // value -> result
         CONVI4x69      = 32'h0069, // value -> result
-        RETx2A         = 32'h002A, // ?                  -> . (empty except for returned value)
+        RETx2A         = 32'h002A, // ?     -> . (empty except for returned value)
         CONVI8x6A      = 32'h006A, // value -> result
         CONVR4x6B      = 32'h006B, // value -> result
         CONVR8x6C      = 32'h006C, // value -> result
@@ -236,9 +235,9 @@ module fop
         REFANYTYPExFE1D= 32'hFE1D // ., TypedRef -> ., type        
     } CILOP;
    
-//temp
     // stack: slots, pointers, stack frame information
     typedef struct {
+        // The registers below (until 'slot[]') fill the slots
         // Id of owner method
         logic [31:0] SF_MIT_ID;       // 32'h00
         // Instance id (if not static => 0)
@@ -274,7 +273,6 @@ module fop
     
     stack_t stack;
  
- 
     ///////////////////////////////////////////////////////////////////////////
     //  COMPILE-TIME INFORMATION TABLES (e.g. mem.sv)
     ///////////////////////////////////////////////////////////////////////////
@@ -303,7 +301,7 @@ module fop
         logic [31:0] MIT_NUMCIL;        // Num. CIL of instruc.
         logic [31:0] MIT_FIRSTCIL;      // First CIL record index for this particular method
         logic [31:0] MIT_SIZE;          // Size of one method entry record
-        logic [8*20:1] mit_names [0:63];// class:method names concatinated 
+        logic [8*20:1] mit_names [0:63];// class:method names concatinated (debug help)
         
         // CIT_MIT_CIL: Class Method CIL Information Table
         logic [31:0] cil [0:127];       // cil instructions information table
@@ -311,370 +309,11 @@ module fop
         logic [31:0] CIL_OPCODE;        // CIL opcode
         logic [31:0] CIL_OPERAND;       // CIL opcode
         logic [31:0] CIL_SIZE;          // Size of one cil entry record
-        logic [8*20:1] cil_names [0:65535];// cil opnames
+        logic [8*20:1] cil_names [0:65535];// cil opnames (debug help)
     } tables;
     
-    // "Read" memory files
-    initial begin
-        // TABLE HELPER FIELDS from 'tables' struct
-        // Class information table 
-        tables.CIT_ID           <= 32'h00; // Class id
-        tables.CIT_NUMFIELDS    <= 32'h01; // Number of fields
-        tables.CIT_NUMMETHODS   <= 32'h02; // Number of metods
-        tables.CIT_SIZE         <= 32'h03; // Number of entries
-        // Class field information table
-        tables.FIT_ID           <= 32'h00; // Field id
-        tables.FIT_FIELDTYPE    <= 32'h01; // Field type
-        tables.FIT_SIZE         <= 32'h02; // Number of FIT entries
-        // Method information table
-        tables.MIT_ID           <= 32'h00; // Method id
-        tables.MIT_CIT_ID       <= 32'h01; // Foreign key to CIT_ID (the class owning the method)
-        tables.MIT_NUMARGS      <= 32'h02; // Number of arguments
-        tables.MIT_NUMLOCALS    <= 32'h03; // Number of locals
-        tables.MIT_MAXEVALSTACK <= 32'h04; // Max. eval. stack
-        tables.MIT_NUMCIL       <= 32'h05; // Num. CIL of instruc.
-        tables.MIT_FIRSTCIL     <= 32'h06; // First CIL record index for this particular method
-        tables.MIT_SIZE         <= 32'h07; // Size of one method entry record
-        // CIT_MIT_CIL: Class Method CIL Information Table
-        tables.CIL_ID           <= 32'h00; // CIL id (per method)
-        tables.CIL_OPCODE       <= 32'h01; // CIL opcode
-        tables.CIL_OPERAND      <= 32'h02; // CIL opcode
-        tables.CIL_SIZE         <= 32'h03; // Size of one cil entry record
-        
-        // PROGRAM LOADING    
-        //`include "mem.sv" // or load directly in test
-        // cit records:         [0]CIT_ID
-                             // [1]CIT_NUMFIELDS
-                             // [2]CIT_NUMMETHODS
-        tables.cit[0000] <= 32'h00000000;      // CIT_ID. NOTE: This used to be 2, which came from the assembler.
-        tables.cit[0001] <= 32'h00000000;      // CIT_NUMFIELDS
-        tables.cit[0002] <= 32'h00000004;      // CIT_NUMMETHODS
-        
-        // --------------------------------------------------------------------------  
-        // mit records are constant size
-        // mit records:     [0]MIT_ID
-                         // [1]MIT_CIT_ID (foreign key)
-                         // [2]MIT_NUMARGS
-                         // [3]MIT_NUMLOCALS
-                         // [4]MIT_MAXEVALSTACK
-                         // [5]MIT_NUMCIL
-                         // [6]MIT_FIRSTCIL: Points to the index in the cil table for the first CIL record for this method.
-        // BasicClass:main
-        tables.mit[0000] <= 32'h00000000;      // MIT_ID: Changed from 1 to 0 to give direct index multiplied with MIT_SIZE
-        tables.mit[0001] <= 32'h00000000;      // MIT_CIT_ID (foreign key: index into cit[XX * CIT_SIZE])
-        tables.mit[0002] <= 32'h00000000;      // MIT_NUMARGS
-        tables.mit[0003] <= 32'h00000000;      // MIT_NUMLOCALS
-        tables.mit[0004] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        tables.mit[0005] <= 32'h00000006;      // MIT_NUMCIL
-        tables.mit[0006] <= 32'h00000000;      // MIT_FIRSTCIL
-        // BasicClass:.ctor
-        tables.mit[0007] <= 32'h00000001;      // MIT_ID
-        tables.mit[0008] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
-        tables.mit[0009] <= 32'h00000001;      // MIT_NUMARGS
-        tables.mit[0010] <= 32'h00000000;      // MIT_NUMLOCALS
-        tables.mit[0011] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        tables.mit[0012] <= 32'h00000001;      // MIT_NUMCIL
-        tables.mit[0013] <= 32'h00000012;      // MIT_FIRSTCIL
-        // BasicClass:Method1
-        tables.mit[0014] <= 32'h00000002;      // MIT_ID
-        tables.mit[0015] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
-        tables.mit[0016] <= 32'h00000002;      // MIT_NUMARGS
-        tables.mit[0017] <= 32'h00000002;      // MIT_NUMLOCALS
-        tables.mit[0018] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        tables.mit[0019] <= 32'h00000003;      // MIT_NUMCIL
-        tables.mit[0020] <= 32'h00000015;      // MIT_FIRSTCIL
-        // BasicClass:Method2
-        tables.mit[0021] <= 32'h00000003;      // MIT_ID
-        tables.mit[0022] <= 32'h00000000;      // MIT_CIT_ID (foreign [key])
-        tables.mit[0023] <= 32'h00000000;      // MIT_NUMARGS
-        tables.mit[0024] <= 32'h00000001;      // MIT_NUMLOCALS
-        tables.mit[0025] <= 32'h00000008;      // MIT_MAXEVALSTACK
-        tables.mit[0026] <= 32'h00000003;      // MIT_NUMCIL
-        tables.mit[0027] <= 32'h0000001E;      // MIT_FIRSTCIL
-        // mit names records:[0]MIT_ID_NAME
-        tables.mit_names[00000000] <= "noname";                   // MIT_ID_NAME
-        tables.mit_names[00000001] <= "BasicClass:main";          // MIT_ID_NAME
-        tables.mit_names[00000002] <= "BasicClass:.ctor";         // MIT_ID_NAME
-        tables.mit_names[00000003] <= "BasicClass:Method1";       // MIT_ID_NAME
-        tables.mit_names[00000004] <= "BasicClass:Method2";       // MIT_ID_NAME
-        
-        // --------------------------------------------------------------------------
-        // cil records: [0]CIL_ID
-                     // [1]CIL_OPCODE
-                     // [2]CIL_OPERAND
-        // BasicClass : main : rva 0x00000250
-        tables.cil[0000] <= 32'h00000000;      // CIL_ID
-        tables.cil[0001] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-        tables.cil[0002] <= 32'h00000005;      // CIL_OPERAND:     5
-        // BasicClass : main : rva 0x00000250
-        tables.cil[0003] <= 32'h00000001;      // CIL_ID
-        tables.cil[0004] <= 32'h00000073;      // CIL_OPCODE:      newobj
-        tables.cil[0005] <= 32'h06000002;      // CIL_OPERAND:     100663298
-        // BasicClass : main : rva 0x00000250
-        tables.cil[0006] <= 32'h00000002;      // CIL_ID
-        tables.cil[0007] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-        tables.cil[0008] <= 32'h0000000A;      // CIL_OPERAND:     10
-        // BasicClass : main : rva 0x00000250
-        tables.cil[0009] <= 32'h00000003;      // IL_ID
-        tables.cil[0010] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-        tables.cil[0011] <= 32'h00000014;      // CIL_OPERAND:     20
-        // BasicClass : main : rva 0x00000250
-        tables.cil[0012] <= 32'h00000004;      // CIL_ID
-        tables.cil[0013] <= 32'h00000028;      // CIL_OPCODE:      call
-        tables.cil[0014] <= 32'h06000003;      // CIL_OPERAND:     100663299
-        // BasicClass : main : rva 0x00000250
-        tables.cil[0015] <= 32'h00000005;      // CIL_ID
-        tables.cil[0016] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        tables.cil[0017] <= 32'h00000000;      // CIL_OPERAND:     0
-        // BasicClass : .ctor : rva 0x0000026b
-        tables.cil[0018] <= 32'h00000006;      // CIL_ID
-        tables.cil[0019] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        tables.cil[0020] <= 32'h00000000;      // CIL_OPERAND:     0
-        // BasicClass : Method1 : rva 0x00000270
-        tables.cil[0021] <= 32'h00000007;      // CIL_ID
-        tables.cil[0022] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
-        tables.cil[0023] <= 32'h00000000;      // CIL_OPERAND:     0
-        // BasicClass : Method1 : rva 0x00000270
-        tables.cil[0024] <= 32'h00000008;      // CIL_ID
-        tables.cil[0025] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
-        tables.cil[0026] <= 32'h00000000;      // CIL_OPERAND:     0
-        // BasicClass : Method1 : rva 0x00000270
-        tables.cil[0027] <= 32'h00000009;      // CIL_ID
-        tables.cil[0028] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        tables.cil[0029] <= 32'h00000000;      // CIL_OPERAND:     0
-        // BasicClass : Method2 : rva 0x00000280
-        tables.cil[0030] <= 32'h0000000A;      // CIL_ID
-        tables.cil[0031] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
-        tables.cil[0032] <= 32'h00000000;      // CIL_OPERAND:     0
-        // BasicClass : Method2 : rva 0x00000280
-        tables.cil[0033] <= 32'h0000000B;      // CIL_ID
-        tables.cil[0034] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
-        tables.cil[0035] <= 32'h00000000;      // CIL_OPERAND:     0
-        // BasicClass : Method2 : rva 0x00000280
-        tables.cil[0036] <= 32'h0000000C;      // CIL_ID
-        tables.cil[0037] <= 32'h0000002A;      // CIL_OPCODE:      ret
-        tables.cil[0038] <= 32'h00000000;      // CIL_OPERAND:     0
-    end   
 
-    initial begin
-        //`include "cil_names_info.sv"
-        tables.cil_names[16'h0000] <= "NOPx00";
-        tables.cil_names[16'h0001] <= "BREAKx01";
-        tables.cil_names[16'h0002] <= "LDARG0x02";
-        tables.cil_names[16'h0003] <= "LDARG1x03";
-        tables.cil_names[16'h0004] <= "LDARG2x04";
-        tables.cil_names[16'h0005] <= "LDARG3x05";
-        tables.cil_names[16'h0006] <= "LDLOC0x06";
-        tables.cil_names[16'h0007] <= "LDLOC1x07";
-        tables.cil_names[16'h0008] <= "LDLOC2x08";
-        tables.cil_names[16'h0009] <= "LDLOC3x09";
-        tables.cil_names[16'h000A] <= "STLOC0x0A";
-        tables.cil_names[16'h000B] <= "STLOC1x0B";
-        tables.cil_names[16'h000C] <= "STLOC2x0C";
-        tables.cil_names[16'h000D] <= "STLOC3x0D";
-        tables.cil_names[16'h0010] <= "STARGSx10";
-        tables.cil_names[16'h0011] <= "LDLOCSx11";
-        tables.cil_names[16'h0012] <= "LDLOCASx12";
-        tables.cil_names[16'h0013] <= "STLOCSx13";
-        tables.cil_names[16'h0014] <= "LDNULLx14";
-        tables.cil_names[16'h0015] <= "LDCI4M1x15";
-        tables.cil_names[16'h0016] <= "LDCI40x16";
-        tables.cil_names[16'h0017] <= "LDCI41x17";
-        tables.cil_names[16'h0018] <= "LDCI42x18";
-        tables.cil_names[16'h0019] <= "LDCI43x19";
-        tables.cil_names[16'h001A] <= "LDCI44x1A";
-        tables.cil_names[16'h001B] <= "LDCI45x1B";
-        tables.cil_names[16'h001C] <= "LDCI46x1C";
-        tables.cil_names[16'h001D] <= "LDCI47x1D";
-        tables.cil_names[16'h001E] <= "LDCI48x1E";
-        tables.cil_names[16'h001F] <= "LDCI44Sx1F";
-        tables.cil_names[16'h000E] <= "LDARGSx0E";
-        tables.cil_names[16'h000F] <= "LDARGASx0F";
-        tables.cil_names[16'h0020] <= "LDCI4x20";
-        tables.cil_names[16'h0021] <= "LDCI8x21";
-        tables.cil_names[16'h0022] <= "LDCR4x22";
-        tables.cil_names[16'h0023] <= "LDCR8x23";
-        tables.cil_names[16'h0025] <= "DUPx25";
-        tables.cil_names[16'h0026] <= "POPx26";
-        tables.cil_names[16'h0027] <= "JMPx27";
-        tables.cil_names[16'h0028] <= "CALLx28";
-        tables.cil_names[16'h0029] <= "CALLIx29";
-        tables.cil_names[16'h002A] <= "RETx2A";
-        tables.cil_names[16'h002B] <= "BRSx2B";
-        tables.cil_names[16'h002C] <= "BRFALSESx2C";
-        tables.cil_names[16'h002D] <= "BRTRUESx2D";
-        tables.cil_names[16'h002E] <= "BEQSx2E";
-        tables.cil_names[16'h002F] <= "BGESx2F";
-        tables.cil_names[16'h0030] <= "BGTSx30";
-        tables.cil_names[16'h0031] <= "BLESx31";
-        tables.cil_names[16'h0032] <= "BLTSx32";
-        tables.cil_names[16'h0033] <= "BNEUNSx33";
-        tables.cil_names[16'h0034] <= "BGEUNSx34";
-        tables.cil_names[16'h0035] <= "BGTUNSx35";
-        tables.cil_names[16'h0036] <= "BLEUNSx36";
-        tables.cil_names[16'h0037] <= "BLTUNSx37";
-        tables.cil_names[16'h0038] <= "BRx38";
-        tables.cil_names[16'h0039] <= "BRFALSEx39";
-        tables.cil_names[16'h003A] <= "BRTRUEx3A";
-        tables.cil_names[16'h003A] <= "BRINSTx3A";
-        tables.cil_names[16'h003B] <= "BEQx3B";
-        tables.cil_names[16'h003C] <= "BGEx3C";
-        tables.cil_names[16'h002E] <= "BGTx3D";
-        tables.cil_names[16'h003E] <= "BLEx3E";
-        tables.cil_names[16'h003F] <= "BLTx3F";
-        tables.cil_names[16'h0040] <= "BNEUNx40";
-        tables.cil_names[16'h0041] <= "BGEUNx41";
-        tables.cil_names[16'h0042] <= "BGTUNx42";
-        tables.cil_names[16'h0043] <= "BLEUNx43";
-        tables.cil_names[16'h0044] <= "BLTUNx44";
-        tables.cil_names[16'h0045] <= "SWITCHx45";
-        tables.cil_names[16'h0046] <= "LDINDI1x46";
-        tables.cil_names[16'h0047] <= "LDINDU1x47";
-        tables.cil_names[16'h0048] <= "LDINDI2x48";
-        tables.cil_names[16'h0049] <= "LDINDU2x49";
-        tables.cil_names[16'h004A] <= "LDINDI4x4A";
-        tables.cil_names[16'h004B] <= "LDINDU4x4B";
-        tables.cil_names[16'h004C] <= "LDINDI8x4C";
-        tables.cil_names[16'h004C] <= "LDINDU8x4C";
-        tables.cil_names[16'h004D] <= "LDINDIx4D";
-        tables.cil_names[16'h004E] <= "LDINDR4x4E";
-        tables.cil_names[16'h004F] <= "LDINDR8x4F";
-        tables.cil_names[16'h0050] <= "LDINDREFx50";
-        tables.cil_names[16'h0051] <= "STINDREFx51";
-        tables.cil_names[16'h0052] <= "STNDI1x52";
-        tables.cil_names[16'h0053] <= "STINDI2x53";
-        tables.cil_names[16'h0054] <= "STINDI4x54";
-        tables.cil_names[16'h0055] <= "STINDI8x55";
-        tables.cil_names[16'h0056] <= "STINDR4x56";
-        tables.cil_names[16'h0057] <= "STINDR8x57";
-        tables.cil_names[16'h0058] <= "ADDx58";
-        tables.cil_names[16'h0059] <= "SUBx59";
-        tables.cil_names[16'h005A] <= "MULx5A";
-        tables.cil_names[16'h005B] <= "DIVx5B";
-        tables.cil_names[16'h005C] <= "DIVUNx5C";
-        tables.cil_names[16'h005D] <= "REMx5D";
-        tables.cil_names[16'h005E] <= "REMUNx5E";
-        tables.cil_names[16'h005F] <= "ANDx5F";
-        tables.cil_names[16'h0060] <= "ORx60";
-        tables.cil_names[16'h0061] <= "XORx61";
-        tables.cil_names[16'h0062] <= "SHLx62";
-        tables.cil_names[16'h0063] <= "SHRx63";
-        tables.cil_names[16'h0064] <= "SHRUNx64";
-        tables.cil_names[16'h0065] <= "NEGx65";
-        tables.cil_names[16'h0066] <= "NOTx66";
-        tables.cil_names[16'h0067] <= "CONVI1x67";
-        tables.cil_names[16'h0068] <= "CONVI2x68";
-        tables.cil_names[16'h0069] <= "CONVI4x69";
-        tables.cil_names[16'h002A] <= "RETx2A";
-        tables.cil_names[16'h006A] <= "CONVI8x6A";
-        tables.cil_names[16'h006B] <= "CONVR4x6B";
-        tables.cil_names[16'h006C] <= "CONVR8x6C";
-        tables.cil_names[16'h006D] <= "CONVU4x6D";
-        tables.cil_names[16'h006E] <= "CONVU8x6E";
-        tables.cil_names[16'h0076] <= "CONVRUNx76";
-        tables.cil_names[16'h007B] <= "LDFLDx7B";
-        tables.cil_names[16'h0082] <= "CONVOVFI1UNx82";
-        tables.cil_names[16'h0083] <= "CONVOVFI2UNx83";
-        tables.cil_names[16'h0084] <= "CONVOVFI4UNx84";
-        tables.cil_names[16'h0085] <= "CONVOVFI8UNx85";
-        tables.cil_names[16'h0086] <= "CONVOVFU1UNx86";
-        tables.cil_names[16'h0087] <= "CONVOVFU2UNx87";
-        tables.cil_names[16'h0088] <= "CONVOVFU4UNx88";
-        tables.cil_names[16'h0089] <= "CONVOVFU8UNx89";
-        tables.cil_names[16'h008A] <= "CONVOVFIUNx8A";
-        tables.cil_names[16'h008B] <= "CONVOVFUUNx8B";
-        tables.cil_names[16'h00B3] <= "CONVOVFI1xB3";
-        tables.cil_names[16'h00B4] <= "CONVOVFU1xB4";
-        tables.cil_names[16'h00B5] <= "CONVOVFI2xB5";
-        tables.cil_names[16'h00B6] <= "CONVOVFU2xB6";
-        tables.cil_names[16'h00B7] <= "CONVOVFI4xB7";
-        tables.cil_names[16'h00B9] <= "CONVOVFI8xB9";
-        tables.cil_names[16'h00BA] <= "CONVOVFI2xBA";
-        tables.cil_names[16'h00C3] <= "CKFINITExC3";
-        tables.cil_names[16'h00D1] <= "CONVU2xD1";
-        tables.cil_names[16'h00D2] <= "CONVU1xD2";
-        tables.cil_names[16'h00D3] <= "CONVIxD3";
-        tables.cil_names[16'h00D5] <= "CONVOVFUxD5";
-        tables.cil_names[16'h00D6] <= "ADDOVFxD6";
-        tables.cil_names[16'h00D7] <= "ADDOVFUNxD7";
-        tables.cil_names[16'h00D8] <= "MULOVFxD8";
-        tables.cil_names[16'h00D9] <= "MULOVFUNxD9";
-        tables.cil_names[16'h00DA] <= "SUBOVFxDA";
-        tables.cil_names[16'h00DB] <= "SUBOVFUNxDB";
-        tables.cil_names[16'h00DC] <= "ENDFAULTxDC";
-        tables.cil_names[16'h00DC] <= "ENDFINALLYxDC";
-        tables.cil_names[16'h00DD] <= "LEAVExDD";
-        tables.cil_names[16'h00DE] <= "LEAVESxDE";
-        tables.cil_names[16'h00DF] <= "STINDIxDF";
-        tables.cil_names[16'h00E0] <= "CONVUxE0";
-        tables.cil_names[16'hFE01] <= "CEQxFE01";
-        tables.cil_names[16'hFE00] <= "ARGLISTxFE00";
-        tables.cil_names[16'hFE02] <= "CGTxFE02";
-        tables.cil_names[16'hFE03] <= "CGTUNxFE03";
-        tables.cil_names[16'hFE04] <= "CLTxFE04";
-        tables.cil_names[16'hFE05] <= "CLTUNxFE05";
-        tables.cil_names[16'hFE06] <= "LDFTNxFE06";
-        tables.cil_names[16'hFE09] <= "LDARGxFE09";
-        tables.cil_names[16'hFE0A] <= "LDARGAxFE0A";
-        tables.cil_names[16'hFE0B] <= "STARGxFE0B";
-        tables.cil_names[16'hFE11] <= "ENDFILTERxFE11";
-        tables.cil_names[16'hFE17] <= "CPBLKxFE17";
-        tables.cil_names[16'hFE18] <= "INITBLKxFE18";
-        tables.cil_names[16'hFE0C] <= "LDLOCxFE0C";
-        tables.cil_names[16'hFE0D] <= "LDLOCAxFE0D";
-        tables.cil_names[16'hFE0E] <= "STLOCxFE0E";
-        tables.cil_names[16'hFE0F] <= "LOCALLOCxFE0F";
-        tables.cil_names[16'h006F] <= "CALLVIRTx6F";
-        tables.cil_names[16'h0070] <= "CPOBJx70";
-        tables.cil_names[16'h0071] <= "LDOBJx71";
-        tables.cil_names[16'h0072] <= "LDSTRx72";
-        tables.cil_names[16'h0073] <= "NEWOBJx73";
-        tables.cil_names[16'h0074] <= "CASTCLASSx74";
-        tables.cil_names[16'h007E] <= "LDSFLDx7E";
-        tables.cil_names[16'h007F] <= "LDSFLDAx7F";
-        tables.cil_names[16'h008C] <= "BOXx8C";
-        tables.cil_names[16'h0075] <= "ISINSTx75";
-        tables.cil_names[16'h0079] <= "UNBOXx79";
-        tables.cil_names[16'h007A] <= "THROWx7A";
-        tables.cil_names[16'h007B] <= "LDFLDx7B";
-        tables.cil_names[16'h007C] <= "LDFLDAx7C";
-        tables.cil_names[16'h007D] <= "STFLDx7D";
-        tables.cil_names[16'h0080] <= "STSFLDx80";
-        tables.cil_names[16'h0081] <= "STOBJx81";
-        tables.cil_names[16'h008D] <= "NEWARRx8D";
-        tables.cil_names[16'h008E] <= "LDLENx8E";
-        tables.cil_names[16'h008F] <= "LDELEMAx8F";
-        tables.cil_names[16'h0090] <= "LDELEMI1x90";
-        tables.cil_names[16'h0091] <= "LDELEMU1x91";
-        tables.cil_names[16'h0092] <= "LDELEMI2x92";
-        tables.cil_names[16'h0093] <= "LDELEMU2x93";
-        tables.cil_names[16'h0094] <= "LDELEMI4x94";
-        tables.cil_names[16'h0095] <= "LDELEMU4x95";
-        tables.cil_names[16'h0096] <= "LDELEMI8x96";
-        tables.cil_names[16'h0096] <= "LDELEMU8x96";
-        tables.cil_names[16'h0097] <= "LDELEMIx97";
-        tables.cil_names[16'h0098] <= "LDELEMR4x98";
-        tables.cil_names[16'h0099] <= "LDELEMR8x99";
-        tables.cil_names[16'h009A] <= "LDELEMREFx9A";
-        tables.cil_names[16'h009B] <= "STELEMIx9B";
-        tables.cil_names[16'h009C] <= "STELEMI1x9C";
-        tables.cil_names[16'h009D] <= "STELEMI2x9D";
-        tables.cil_names[16'h009E] <= "STELEMI4x9E";
-        tables.cil_names[16'h00A0] <= "STELEMR4xA0";
-        tables.cil_names[16'h00A1] <= "STELEMR8xA1";
-        tables.cil_names[16'h00A2] <= "STELEMREFxA2";
-        tables.cil_names[16'h00A3] <= "LDELEMxA3";
-        tables.cil_names[16'h00A4] <= "STELEMxA4";
-        tables.cil_names[16'h00A5] <= "UNBOXANYxA5";
-        tables.cil_names[16'h00C2] <= "REFANYVALxC2";
-        tables.cil_names[16'h00C6] <= "MKREFANYxC6";
-        tables.cil_names[16'h00D0] <= "LDTOKENxD0";
-        tables.cil_names[16'hFE07] <= "LDVIRTFNxFE07"; // FE07
-        tables.cil_names[16'hFE15] <= "INITOBJxFE15"; // FE15
-        tables.cil_names[16'hFE1A] <= "RETHROWxFE1A"; // FE1A
-        tables.cil_names[16'hFE1C] <= "SIZEOFxFE1C"; // FE1C
-        tables.cil_names[16'hFE1D] <= "REFANYTYPExFE1D"; // FE1D
-    end
+
     
     ///////////////////////////////////////////////////////////////////////////
     // RUNTIME STRUCTS
@@ -733,13 +372,14 @@ module fop
         $display("////////////////////////////////////////////////////////////////////////////////");
         if (reset) 
             begin
-                $display("->InitOnReset()");
+                $display("Reset()");
+                preInitOnReset();
                 initOnReset();
             end
         else if (enable)
             begin
                 cilSwitch();
-             end 
+            end 
     end
     
     // Called from main loop
@@ -972,6 +612,252 @@ module fop
              endcase    
         end
     endtask
+
+    task preInitOnReset();
+       begin
+           tables.cil_names[16'h0000] <= "NOPx00";
+           tables.cil_names[16'h0001] <= "BREAKx01";
+           tables.cil_names[16'h0002] <= "LDARG0x02";
+           tables.cil_names[16'h0003] <= "LDARG1x03";
+           tables.cil_names[16'h0004] <= "LDARG2x04";
+           tables.cil_names[16'h0005] <= "LDARG3x05";
+           tables.cil_names[16'h0006] <= "LDLOC0x06";
+           tables.cil_names[16'h0007] <= "LDLOC1x07";
+           tables.cil_names[16'h0008] <= "LDLOC2x08";
+           tables.cil_names[16'h0009] <= "LDLOC3x09";
+           tables.cil_names[16'h000A] <= "STLOC0x0A";
+           tables.cil_names[16'h000B] <= "STLOC1x0B";
+           tables.cil_names[16'h000C] <= "STLOC2x0C";
+           tables.cil_names[16'h000D] <= "STLOC3x0D";
+           tables.cil_names[16'h0010] <= "STARGSx10";
+           tables.cil_names[16'h0011] <= "LDLOCSx11";
+           tables.cil_names[16'h0012] <= "LDLOCASx12";
+           tables.cil_names[16'h0013] <= "STLOCSx13";
+           tables.cil_names[16'h0014] <= "LDNULLx14";
+           tables.cil_names[16'h0015] <= "LDCI4M1x15";
+           tables.cil_names[16'h0016] <= "LDCI40x16";
+           tables.cil_names[16'h0017] <= "LDCI41x17";
+           tables.cil_names[16'h0018] <= "LDCI42x18";
+           tables.cil_names[16'h0019] <= "LDCI43x19";
+           tables.cil_names[16'h001A] <= "LDCI44x1A";
+           tables.cil_names[16'h001B] <= "LDCI45x1B";
+           tables.cil_names[16'h001C] <= "LDCI46x1C";
+           tables.cil_names[16'h001D] <= "LDCI47x1D";
+           tables.cil_names[16'h001E] <= "LDCI48x1E";
+           tables.cil_names[16'h001F] <= "LDCI44Sx1F";
+           tables.cil_names[16'h000E] <= "LDARGSx0E";
+           tables.cil_names[16'h000F] <= "LDARGASx0F";
+           tables.cil_names[16'h0020] <= "LDCI4x20";
+           tables.cil_names[16'h0021] <= "LDCI8x21";
+           tables.cil_names[16'h0022] <= "LDCR4x22";
+           tables.cil_names[16'h0023] <= "LDCR8x23";
+           tables.cil_names[16'h0025] <= "DUPx25";
+           tables.cil_names[16'h0026] <= "POPx26";
+           tables.cil_names[16'h0027] <= "JMPx27";
+           tables.cil_names[16'h0028] <= "CALLx28";
+           tables.cil_names[16'h0029] <= "CALLIx29";
+           tables.cil_names[16'h002A] <= "RETx2A";
+           tables.cil_names[16'h002B] <= "BRSx2B";
+           tables.cil_names[16'h002C] <= "BRFALSESx2C";
+           tables.cil_names[16'h002D] <= "BRTRUESx2D";
+           tables.cil_names[16'h002E] <= "BEQSx2E";
+           tables.cil_names[16'h002F] <= "BGESx2F";
+           tables.cil_names[16'h0030] <= "BGTSx30";
+           tables.cil_names[16'h0031] <= "BLESx31";
+           tables.cil_names[16'h0032] <= "BLTSx32";
+           tables.cil_names[16'h0033] <= "BNEUNSx33";
+           tables.cil_names[16'h0034] <= "BGEUNSx34";
+           tables.cil_names[16'h0035] <= "BGTUNSx35";
+           tables.cil_names[16'h0036] <= "BLEUNSx36";
+           tables.cil_names[16'h0037] <= "BLTUNSx37";
+           tables.cil_names[16'h0038] <= "BRx38";
+           tables.cil_names[16'h0039] <= "BRFALSEx39";
+           tables.cil_names[16'h003A] <= "BRTRUEx3A";
+           tables.cil_names[16'h003A] <= "BRINSTx3A";
+           tables.cil_names[16'h003B] <= "BEQx3B";
+           tables.cil_names[16'h003C] <= "BGEx3C";
+           tables.cil_names[16'h002E] <= "BGTx3D";
+           tables.cil_names[16'h003E] <= "BLEx3E";
+           tables.cil_names[16'h003F] <= "BLTx3F";
+           tables.cil_names[16'h0040] <= "BNEUNx40";
+           tables.cil_names[16'h0041] <= "BGEUNx41";
+           tables.cil_names[16'h0042] <= "BGTUNx42";
+           tables.cil_names[16'h0043] <= "BLEUNx43";
+           tables.cil_names[16'h0044] <= "BLTUNx44";
+           tables.cil_names[16'h0045] <= "SWITCHx45";
+           tables.cil_names[16'h0046] <= "LDINDI1x46";
+           tables.cil_names[16'h0047] <= "LDINDU1x47";
+           tables.cil_names[16'h0048] <= "LDINDI2x48";
+           tables.cil_names[16'h0049] <= "LDINDU2x49";
+           tables.cil_names[16'h004A] <= "LDINDI4x4A";
+           tables.cil_names[16'h004B] <= "LDINDU4x4B";
+           tables.cil_names[16'h004C] <= "LDINDI8x4C";
+           tables.cil_names[16'h004C] <= "LDINDU8x4C";
+           tables.cil_names[16'h004D] <= "LDINDIx4D";
+           tables.cil_names[16'h004E] <= "LDINDR4x4E";
+           tables.cil_names[16'h004F] <= "LDINDR8x4F";
+           tables.cil_names[16'h0050] <= "LDINDREFx50";
+           tables.cil_names[16'h0051] <= "STINDREFx51";
+           tables.cil_names[16'h0052] <= "STNDI1x52";
+           tables.cil_names[16'h0053] <= "STINDI2x53";
+           tables.cil_names[16'h0054] <= "STINDI4x54";
+           tables.cil_names[16'h0055] <= "STINDI8x55";
+           tables.cil_names[16'h0056] <= "STINDR4x56";
+           tables.cil_names[16'h0057] <= "STINDR8x57";
+           tables.cil_names[16'h0058] <= "ADDx58";
+           tables.cil_names[16'h0059] <= "SUBx59";
+           tables.cil_names[16'h005A] <= "MULx5A";
+           tables.cil_names[16'h005B] <= "DIVx5B";
+           tables.cil_names[16'h005C] <= "DIVUNx5C";
+           tables.cil_names[16'h005D] <= "REMx5D";
+           tables.cil_names[16'h005E] <= "REMUNx5E";
+           tables.cil_names[16'h005F] <= "ANDx5F";
+           tables.cil_names[16'h0060] <= "ORx60";
+           tables.cil_names[16'h0061] <= "XORx61";
+           tables.cil_names[16'h0062] <= "SHLx62";
+           tables.cil_names[16'h0063] <= "SHRx63";
+           tables.cil_names[16'h0064] <= "SHRUNx64";
+           tables.cil_names[16'h0065] <= "NEGx65";
+           tables.cil_names[16'h0066] <= "NOTx66";
+           tables.cil_names[16'h0067] <= "CONVI1x67";
+           tables.cil_names[16'h0068] <= "CONVI2x68";
+           tables.cil_names[16'h0069] <= "CONVI4x69";
+           tables.cil_names[16'h002A] <= "RETx2A";
+           tables.cil_names[16'h006A] <= "CONVI8x6A";
+           tables.cil_names[16'h006B] <= "CONVR4x6B";
+           tables.cil_names[16'h006C] <= "CONVR8x6C";
+           tables.cil_names[16'h006D] <= "CONVU4x6D";
+           tables.cil_names[16'h006E] <= "CONVU8x6E";
+           tables.cil_names[16'h0076] <= "CONVRUNx76";
+           tables.cil_names[16'h007B] <= "LDFLDx7B";
+           tables.cil_names[16'h0082] <= "CONVOVFI1UNx82";
+           tables.cil_names[16'h0083] <= "CONVOVFI2UNx83";
+           tables.cil_names[16'h0084] <= "CONVOVFI4UNx84";
+           tables.cil_names[16'h0085] <= "CONVOVFI8UNx85";
+           tables.cil_names[16'h0086] <= "CONVOVFU1UNx86";
+           tables.cil_names[16'h0087] <= "CONVOVFU2UNx87";
+           tables.cil_names[16'h0088] <= "CONVOVFU4UNx88";
+           tables.cil_names[16'h0089] <= "CONVOVFU8UNx89";
+           tables.cil_names[16'h008A] <= "CONVOVFIUNx8A";
+           tables.cil_names[16'h008B] <= "CONVOVFUUNx8B";
+           tables.cil_names[16'h00B3] <= "CONVOVFI1xB3";
+           tables.cil_names[16'h00B4] <= "CONVOVFU1xB4";
+           tables.cil_names[16'h00B5] <= "CONVOVFI2xB5";
+           tables.cil_names[16'h00B6] <= "CONVOVFU2xB6";
+           tables.cil_names[16'h00B7] <= "CONVOVFI4xB7";
+           tables.cil_names[16'h00B9] <= "CONVOVFI8xB9";
+           tables.cil_names[16'h00BA] <= "CONVOVFI2xBA";
+           tables.cil_names[16'h00C3] <= "CKFINITExC3";
+           tables.cil_names[16'h00D1] <= "CONVU2xD1";
+           tables.cil_names[16'h00D2] <= "CONVU1xD2";
+           tables.cil_names[16'h00D3] <= "CONVIxD3";
+           tables.cil_names[16'h00D5] <= "CONVOVFUxD5";
+           tables.cil_names[16'h00D6] <= "ADDOVFxD6";
+           tables.cil_names[16'h00D7] <= "ADDOVFUNxD7";
+           tables.cil_names[16'h00D8] <= "MULOVFxD8";
+           tables.cil_names[16'h00D9] <= "MULOVFUNxD9";
+           tables.cil_names[16'h00DA] <= "SUBOVFxDA";
+           tables.cil_names[16'h00DB] <= "SUBOVFUNxDB";
+           tables.cil_names[16'h00DC] <= "ENDFAULTxDC";
+           tables.cil_names[16'h00DC] <= "ENDFINALLYxDC";
+           tables.cil_names[16'h00DD] <= "LEAVExDD";
+           tables.cil_names[16'h00DE] <= "LEAVESxDE";
+           tables.cil_names[16'h00DF] <= "STINDIxDF";
+           tables.cil_names[16'h00E0] <= "CONVUxE0";
+           tables.cil_names[16'hFE01] <= "CEQxFE01";
+           tables.cil_names[16'hFE00] <= "ARGLISTxFE00";
+           tables.cil_names[16'hFE02] <= "CGTxFE02";
+           tables.cil_names[16'hFE03] <= "CGTUNxFE03";
+           tables.cil_names[16'hFE04] <= "CLTxFE04";
+           tables.cil_names[16'hFE05] <= "CLTUNxFE05";
+           tables.cil_names[16'hFE06] <= "LDFTNxFE06";
+           tables.cil_names[16'hFE09] <= "LDARGxFE09";
+           tables.cil_names[16'hFE0A] <= "LDARGAxFE0A";
+           tables.cil_names[16'hFE0B] <= "STARGxFE0B";
+           tables.cil_names[16'hFE11] <= "ENDFILTERxFE11";
+           tables.cil_names[16'hFE17] <= "CPBLKxFE17";
+           tables.cil_names[16'hFE18] <= "INITBLKxFE18";
+           tables.cil_names[16'hFE0C] <= "LDLOCxFE0C";
+           tables.cil_names[16'hFE0D] <= "LDLOCAxFE0D";
+           tables.cil_names[16'hFE0E] <= "STLOCxFE0E";
+           tables.cil_names[16'hFE0F] <= "LOCALLOCxFE0F";
+           tables.cil_names[16'h006F] <= "CALLVIRTx6F";
+           tables.cil_names[16'h0070] <= "CPOBJx70";
+           tables.cil_names[16'h0071] <= "LDOBJx71";
+           tables.cil_names[16'h0072] <= "LDSTRx72";
+           tables.cil_names[16'h0073] <= "NEWOBJx73";
+           tables.cil_names[16'h0074] <= "CASTCLASSx74";
+           tables.cil_names[16'h007E] <= "LDSFLDx7E";
+           tables.cil_names[16'h007F] <= "LDSFLDAx7F";
+           tables.cil_names[16'h008C] <= "BOXx8C";
+           tables.cil_names[16'h0075] <= "ISINSTx75";
+           tables.cil_names[16'h0079] <= "UNBOXx79";
+           tables.cil_names[16'h007A] <= "THROWx7A";
+           tables.cil_names[16'h007B] <= "LDFLDx7B";
+           tables.cil_names[16'h007C] <= "LDFLDAx7C";
+           tables.cil_names[16'h007D] <= "STFLDx7D";
+           tables.cil_names[16'h0080] <= "STSFLDx80";
+           tables.cil_names[16'h0081] <= "STOBJx81";
+           tables.cil_names[16'h008D] <= "NEWARRx8D";
+           tables.cil_names[16'h008E] <= "LDLENx8E";
+           tables.cil_names[16'h008F] <= "LDELEMAx8F";
+           tables.cil_names[16'h0090] <= "LDELEMI1x90";
+           tables.cil_names[16'h0091] <= "LDELEMU1x91";
+           tables.cil_names[16'h0092] <= "LDELEMI2x92";
+           tables.cil_names[16'h0093] <= "LDELEMU2x93";
+           tables.cil_names[16'h0094] <= "LDELEMI4x94";
+           tables.cil_names[16'h0095] <= "LDELEMU4x95";
+           tables.cil_names[16'h0096] <= "LDELEMI8x96";
+           tables.cil_names[16'h0096] <= "LDELEMU8x96";
+           tables.cil_names[16'h0097] <= "LDELEMIx97";
+           tables.cil_names[16'h0098] <= "LDELEMR4x98";
+           tables.cil_names[16'h0099] <= "LDELEMR8x99";
+           tables.cil_names[16'h009A] <= "LDELEMREFx9A";
+           tables.cil_names[16'h009B] <= "STELEMIx9B";
+           tables.cil_names[16'h009C] <= "STELEMI1x9C";
+           tables.cil_names[16'h009D] <= "STELEMI2x9D";
+           tables.cil_names[16'h009E] <= "STELEMI4x9E";
+           tables.cil_names[16'h00A0] <= "STELEMR4xA0";
+           tables.cil_names[16'h00A1] <= "STELEMR8xA1";
+           tables.cil_names[16'h00A2] <= "STELEMREFxA2";
+           tables.cil_names[16'h00A3] <= "LDELEMxA3";
+           tables.cil_names[16'h00A4] <= "STELEMxA4";
+           tables.cil_names[16'h00A5] <= "UNBOXANYxA5";
+           tables.cil_names[16'h00C2] <= "REFANYVALxC2";
+           tables.cil_names[16'h00C6] <= "MKREFANYxC6";
+           tables.cil_names[16'h00D0] <= "LDTOKENxD0";
+           tables.cil_names[16'hFE07] <= "LDVIRTFNxFE07"; // FE07
+           tables.cil_names[16'hFE15] <= "INITOBJxFE15"; // FE15
+           tables.cil_names[16'hFE1A] <= "RETHROWxFE1A"; // FE1A
+           tables.cil_names[16'hFE1C] <= "SIZEOFxFE1C"; // FE1C
+           tables.cil_names[16'hFE1D] <= "REFANYTYPExFE1D"; // FE1D
+
+           // TABLE HELPER FIELDS from 'tables' struct
+           // Class information table 
+           tables.CIT_ID           <= 32'h00; // Class id
+           tables.CIT_NUMFIELDS    <= 32'h01; // Number of fields
+           tables.CIT_NUMMETHODS   <= 32'h02; // Number of metods
+           tables.CIT_SIZE         <= 32'h03; // Number of entries
+           // Class field information table
+           tables.FIT_ID           <= 32'h00; // Field id
+           tables.FIT_FIELDTYPE    <= 32'h01; // Field type
+           tables.FIT_SIZE         <= 32'h02; // Number of FIT entries
+           // Method information table
+           tables.MIT_ID           <= 32'h00; // Method id
+           tables.MIT_CIT_ID       <= 32'h01; // Foreign key to CIT_ID (the class owning the method)
+           tables.MIT_NUMARGS      <= 32'h02; // Number of arguments
+           tables.MIT_NUMLOCALS    <= 32'h03; // Number of locals
+           tables.MIT_MAXEVALSTACK <= 32'h04; // Max. eval. stack
+           tables.MIT_NUMCIL       <= 32'h05; // Num. CIL of instruc.
+           tables.MIT_FIRSTCIL     <= 32'h06; // First CIL record index for this particular method
+           tables.MIT_SIZE         <= 32'h07; // Size of one method entry record
+           // CIT_MIT_CIL: Class Method CIL Information Table
+           tables.CIL_ID           <= 32'h00; // CIL id (per method)
+           tables.CIL_OPCODE       <= 32'h01; // CIL opcode
+           tables.CIL_OPERAND      <= 32'h02; // CIL opcode
+           tables.CIL_SIZE         <= 32'h03; // Size of one cil entry record
+       end
+    endtask
     
     // INITIALIZATION
     task initOnReset();
@@ -1009,24 +895,143 @@ module fop
         end
     endtask
 
+    // "Read" memory files
+    task load();        
+        begin
+            // PROGRAM LOADING    
+            //`include "mem.sv" // or load directly in test
+            // cit records:         [0]CIT_ID
+                                 // [1]CIT_NUMFIELDS
+                                 // [2]CIT_NUMMETHODS
+            tables.cit[0000] <= 32'h00000000;      // CIT_ID. NOTE: This used to be 2, which came from the assembler.
+            tables.cit[0001] <= 32'h00000000;      // CIT_NUMFIELDS
+            tables.cit[0002] <= 32'h00000004;      // CIT_NUMMETHODS
+            
+            // --------------------------------------------------------------------------  
+            // mit records are constant size
+            // mit records:     [0]MIT_ID
+                             // [1]MIT_CIT_ID (foreign key)
+                             // [2]MIT_NUMARGS
+                             // [3]MIT_NUMLOCALS
+                             // [4]MIT_MAXEVALSTACK
+                             // [5]MIT_NUMCIL
+                             // [6]MIT_FIRSTCIL: Points to the index in the cil table for the first CIL record for this method.
+            // BasicClass:main
+            tables.mit[0000] <= 32'h00000000; // MIT_ID: Changed from 1 to 0 to give direct index multiplied with MIT_SIZE
+            tables.mit[0001] <= 32'h00000000; // MIT_CIT_ID (foreign key: index into cit[XX * CIT_SIZE])
+            tables.mit[0002] <= 32'h00000000; // MIT_NUMARGS
+            tables.mit[0003] <= 32'h00000000; // MIT_NUMLOCALS
+            tables.mit[0004] <= 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0005] <= 32'h00000006; // MIT_NUMCIL
+            tables.mit[0006] <= 32'h00000000; // MIT_FIRSTCIL
+            // BasicClass:.ctor
+            tables.mit[0007] <= 32'h00000001; // MIT_ID
+            tables.mit[0008] <= 32'h00000000; // MIT_CIT_ID (foreign [key])
+            tables.mit[0009] <= 32'h00000001; // MIT_NUMARGS
+            tables.mit[0010] <= 32'h00000000; // MIT_NUMLOCALS
+            tables.mit[0011] <= 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0012] <= 32'h00000001; // MIT_NUMCIL
+            tables.mit[0013] <= 32'h00000012; // MIT_FIRSTCIL
+            // BasicClass:Method1
+            tables.mit[0014] <= 32'h00000002; // MIT_ID
+            tables.mit[0015] <= 32'h00000000; // MIT_CIT_ID (foreign [key])
+            tables.mit[0016] <= 32'h00000002; // MIT_NUMARGS
+            tables.mit[0017] <= 32'h00000002; // MIT_NUMLOCALS
+            tables.mit[0018] <= 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0019] <= 32'h00000003; // MIT_NUMCIL
+            tables.mit[0020] <= 32'h00000015; // MIT_FIRSTCIL
+            // BasicClass:Method2
+            tables.mit[0021] <= 32'h00000003; // MIT_ID
+            tables.mit[0022] <= 32'h00000000; // MIT_CIT_ID (foreign [key])
+            tables.mit[0023] <= 32'h00000000; // MIT_NUMARGS
+            tables.mit[0024] <= 32'h00000001; // MIT_NUMLOCALS
+            tables.mit[0025] <= 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0026] <= 32'h00000003; // MIT_NUMCIL
+            tables.mit[0027] <= 32'h0000001E; // MIT_FIRSTCIL
+            // mit names records:[0]MIT_ID_NAME
+            tables.mit_names[00000000] <= "noname";                   // MIT_ID_NAME
+            tables.mit_names[00000001] <= "BasicClass:main";          // MIT_ID_NAME
+            tables.mit_names[00000002] <= "BasicClass:.ctor";         // MIT_ID_NAME
+            tables.mit_names[00000003] <= "BasicClass:Method1";       // MIT_ID_NAME
+            tables.mit_names[00000004] <= "BasicClass:Method2";       // MIT_ID_NAME
+            
+            // --------------------------------------------------------------------------
+            // cil records: [0]CIL_ID
+                         // [1]CIL_OPCODE
+                         // [2]CIL_OPERAND
+            // BasicClass : main : rva 0x00000250
+            tables.cil[0000] <= 32'h00000000;      // CIL_ID
+            tables.cil[0001] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
+            tables.cil[0002] <= 32'h00000005;      // CIL_OPERAND:     5
+            // BasicClass : main : rva 0x00000250
+            tables.cil[0003] <= 32'h00000001;      // CIL_ID
+            tables.cil[0004] <= 32'h00000073;      // CIL_OPCODE:      newobj
+            tables.cil[0005] <= 32'h06000002;      // CIL_OPERAND:     100663298
+            // BasicClass : main : rva 0x00000250
+            tables.cil[0006] <= 32'h00000002;      // CIL_ID
+            tables.cil[0007] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
+            tables.cil[0008] <= 32'h0000000A;      // CIL_OPERAND:     10
+            // BasicClass : main : rva 0x00000250
+            tables.cil[0009] <= 32'h00000003;      // IL_ID
+            tables.cil[0010] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
+            tables.cil[0011] <= 32'h00000014;      // CIL_OPERAND:     20
+            // BasicClass : main : rva 0x00000250
+            tables.cil[0012] <= 32'h00000004;      // CIL_ID
+            tables.cil[0013] <= 32'h00000028;      // CIL_OPCODE:      call
+            tables.cil[0014] <= 32'h06000003;      // CIL_OPERAND:     100663299
+            // BasicClass : main : rva 0x00000250
+            tables.cil[0015] <= 32'h00000005;      // CIL_ID
+            tables.cil[0016] <= 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0017] <= 32'h00000000;      // CIL_OPERAND:     0
+            // BasicClass : .ctor : rva 0x0000026b
+            tables.cil[0018] <= 32'h00000006;      // CIL_ID
+            tables.cil[0019] <= 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0020] <= 32'h00000000;      // CIL_OPERAND:     0
+            // BasicClass : Method1 : rva 0x00000270
+            tables.cil[0021] <= 32'h00000007;      // CIL_ID
+            tables.cil[0022] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
+            tables.cil[0023] <= 32'h00000000;      // CIL_OPERAND:     0
+            // BasicClass : Method1 : rva 0x00000270
+            tables.cil[0024] <= 32'h00000008;      // CIL_ID
+            tables.cil[0025] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
+            tables.cil[0026] <= 32'h00000000;      // CIL_OPERAND:     0
+            // BasicClass : Method1 : rva 0x00000270
+            tables.cil[0027] <= 32'h00000009;      // CIL_ID
+            tables.cil[0028] <= 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0029] <= 32'h00000000;      // CIL_OPERAND:     0
+            // BasicClass : Method2 : rva 0x00000280
+            tables.cil[0030] <= 32'h0000000A;      // CIL_ID
+            tables.cil[0031] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
+            tables.cil[0032] <= 32'h00000000;      // CIL_OPERAND:     0
+            // BasicClass : Method2 : rva 0x00000280
+            tables.cil[0033] <= 32'h0000000B;      // CIL_ID
+            tables.cil[0034] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
+            tables.cil[0035] <= 32'h00000000;      // CIL_OPERAND:     0
+            // BasicClass : Method2 : rva 0x00000280
+            tables.cil[0036] <= 32'h0000000C;      // CIL_ID
+            tables.cil[0037] <= 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0038] <= 32'h00000000;      // CIL_OPERAND:     0
+        end  
+    endtask        
+
     // CREATE STACK FRAME
     // mitId is the method id, and "this" is the identifier for the new instance (or just 0 if it is a static method)
     task createStackFrame(input [31:0] mit_id, input [31:0] this_id);
         begin
-            stack.slot[stack.nsfp + stack.SF_MIT_ID]      <= mit_id;
-            stack.slot[stack.nsfp + stack.SF_CIT_ID]      <= 32'h0; // Only one class so far
-            stack.slot[stack.nsfp + stack.SF_THIS_ID]     <= this_id; // 0 if static method          
-            stack.slot[stack.nsfp + stack.SF_ARGS]        <= 32'h4;   // 4 hardcoded
-            stack.slot[stack.nsfp + stack.SF_LOCS]        <= 32'h4;   // 4 hardcoded
-            stack.slot[stack.nsfp + stack.SF_LR]          <= stack.lr;
-            stack.slot[stack.nsfp + stack.SF_ARG_0]       <= 32'h0;
-            stack.slot[stack.nsfp + stack.SF_ARG_1]       <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_ARG_2]       <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_ARG_3]       <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_0]       <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_1]       <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_2]       <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_3]       <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_MIT_ID]  <= mit_id;
+            stack.slot[stack.nsfp + stack.SF_CIT_ID]  <= 32'h0; // Only one class so far
+            stack.slot[stack.nsfp + stack.SF_THIS_ID] <= this_id; // 0 if static method          
+            stack.slot[stack.nsfp + stack.SF_ARGS]    <= 32'h4;   // 4 hardcoded
+            stack.slot[stack.nsfp + stack.SF_LOCS]    <= 32'h4;   // 4 hardcoded
+            stack.slot[stack.nsfp + stack.SF_LR]      <= stack.lr;
+            stack.slot[stack.nsfp + stack.SF_ARG_0]   <= 32'h0;
+            stack.slot[stack.nsfp + stack.SF_ARG_1]   <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_ARG_2]   <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_ARG_3]   <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_0]   <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_1]   <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_2]   <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_3]   <= 32'h0;          
 
             // Arguments slots
             copyWords(evalstack.esp, stack.nsfp, 32'h4);
