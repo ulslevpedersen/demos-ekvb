@@ -17,35 +17,24 @@ module fop_tb;
                   .reset ( fop_reset ),
                   .enable ( fop_enable )    
              );
-    
-    // init and generate 100 Mhz clock
-    initial
-    begin
-        tb_clk = 1'b0;
-        forever
-        begin
-            #5 tb_clk = ~tb_clk;
-		end
-    end		
-    //always  #( TBCLK_PERIOD/2.0 ) tb_clk = ~tb_clk;
-  
-            
+
     initial fop_reset  = 1'b0;
     initial fop_enable = 1'b0;
+             
+    // init and generate 100 Mhz clock
+    initial begin
+        tb_clk = 1'b0;
+        forever #5 tb_clk = ~tb_clk;
+    end		
     
     initial begin
-	    $display("fop_tb starting...");
+	       @(posedge tb_clk);
+        fop_reset  =#1 1'b1;
+        $display("fop_tb: resetting ...");
         @(posedge tb_clk);
-        // run first instruction
-        fop_reset = 1'b1;
-        $display("fop_tb running...");       
-        @(posedge tb_clk);
-        fop_reset = 1'b0;
-        fop_enable = 1'b1;
-        @(posedge tb_clk);
-        @(posedge tb_clk);
-        @(posedge tb_clk);
-        @(posedge tb_clk);
+        fop_reset  =#1 1'b0;
+        fop_enable =#1 1'b1;
+        $display("fop_tb: enabled ...");
         @(posedge tb_clk);
         #100 $finish;
     end

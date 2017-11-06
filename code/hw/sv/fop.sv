@@ -340,8 +340,6 @@ module fop
         logic [31:0] this_id;   // Current this.   Matches heap.hfp.HF_THIS and stack.sfp.SF_THIS  
     } heap;
 
-//stack was here
-
     // evalstack: slots and eval stack pointer
     struct {
         // evaluation stack
@@ -366,6 +364,9 @@ module fop
     ///////////////////////////////////////////////////////////////////////////
     
     // main loop
+    logic doPreInit;
+    logic doInit;
+    logic doLoad;
     always_ff @(posedge clk) begin
         $display("////////////////////////////////////////////////////////////////////////////////");
         $display("%0d is current time in main loop", $time);
@@ -373,12 +374,29 @@ module fop
         if (reset) 
             begin
                 $display("Reset()");
-                preInitOnReset();
-                initOnReset();
+                doPreInit <=#1 1'b1;
+                doInit    <=#1 1'b0;
+                doLoad    <=#1 1'b0;
             end
         else if (enable)
             begin
-                cilSwitch();
+                if (doPreInit) begin
+                    preInitOnReset();
+                    doPreInit <=#1 1'b0;
+                    doInit    <=#1 1'b1;
+                end
+                else if (doInit) begin
+                    initOnReset();
+                    doInit <=#1 1'b0;
+                    doLoad <=#1 1'b1;
+                end
+                else if (doLoad) begin
+                    load();
+                    doLoad <=#1 1'b0; 
+                end
+                else begin
+                    cilSwitch();
+                end
             end 
     end
     
@@ -864,26 +882,26 @@ module fop
         begin
             $display("initOnReset()");
             // Program state: pc init (points to first CIL instruction in cit_mit_cil)
-            stack.pc     <= 32'h0;
+            stack.pc     <=#1 32'h0;
             // The instruction after stack.pc for the calling method
-            stack.lr     <= 32'h0;
+            stack.lr     <=#1 32'h0;
             // Set "current" instance to 0, but is it does not mean static
             // Just mean that we have to add one to generate first instance id
-            heap.this_id <= 32'h0;
+            heap.this_id <=#1 32'h0;
             
             // stack init
-            stack.sfp     <= 32'h0;
-            stack.nsfp    <= 32'h0;
-            stack.slot[0] <= 32'h73_66_70_5F; //"sfp_"
+            stack.sfp     <=#1 32'h0;
+            stack.nsfp    <=#1 32'h0;
+            stack.slot[0] <=#1 32'h73_66_70_5F; //"sfp_"
             
             // evaluation stack
-            evalstack.esp     <= 32'h0;
-            evalstack.slot[0] <= 32'h65_73_70_5F; //"esp_"
+            evalstack.esp     <=#1 32'h0;
+            evalstack.slot[0] <=#1 32'h65_73_70_5F; //"esp_"
             
             // heap init
-            heap.hfp     <= 32'h0;
-            heap.nhfp    <= 32'h0;
-            heap.slot[0] <= 32'h68_70_5F_5F; //"hp__"
+            heap.hfp     <=#1 32'h0;
+            heap.nhfp    <=#1 32'h0;
+            heap.slot[0] <=#1 32'h68_70_5F_5F; //"hp__"
 
             // Create first (static) heap frame
             // First cit is 0 and "this" is also 0
@@ -903,9 +921,9 @@ module fop
             // cit records:         [0]CIT_ID
                                  // [1]CIT_NUMFIELDS
                                  // [2]CIT_NUMMETHODS
-            tables.cit[0000] <= 32'h00000000;      // CIT_ID. NOTE: This used to be 2, which came from the assembler.
-            tables.cit[0001] <= 32'h00000000;      // CIT_NUMFIELDS
-            tables.cit[0002] <= 32'h00000004;      // CIT_NUMMETHODS
+            tables.cit[0000] <=#1 32'h00000000;      // CIT_ID. NOTE: This used to be 2, which came from the assembler.
+            tables.cit[0001] <=#1 32'h00000000;      // CIT_NUMFIELDS
+            tables.cit[0002] <=#1 32'h00000004;      // CIT_NUMMETHODS
             
             // --------------------------------------------------------------------------  
             // mit records are constant size
@@ -917,100 +935,100 @@ module fop
                              // [5]MIT_NUMCIL
                              // [6]MIT_FIRSTCIL: Points to the index in the cil table for the first CIL record for this method.
             // BasicClass:main
-            tables.mit[0000] <= 32'h00000000; // MIT_ID: Changed from 1 to 0 to give direct index multiplied with MIT_SIZE
-            tables.mit[0001] <= 32'h00000000; // MIT_CIT_ID (foreign key: index into cit[XX * CIT_SIZE])
-            tables.mit[0002] <= 32'h00000000; // MIT_NUMARGS
-            tables.mit[0003] <= 32'h00000000; // MIT_NUMLOCALS
-            tables.mit[0004] <= 32'h00000008; // MIT_MAXEVALSTACK
-            tables.mit[0005] <= 32'h00000006; // MIT_NUMCIL
-            tables.mit[0006] <= 32'h00000000; // MIT_FIRSTCIL
+            tables.mit[0000] <=#1 32'h00000000; // MIT_ID: Changed from 1 to 0 to give direct index multiplied with MIT_SIZE
+            tables.mit[0001] <=#1 32'h00000000; // MIT_CIT_ID (foreign key: index into cit[XX * CIT_SIZE])
+            tables.mit[0002] <=#1 32'h00000000; // MIT_NUMARGS
+            tables.mit[0003] <=#1 32'h00000000; // MIT_NUMLOCALS
+            tables.mit[0004] <=#1 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0005] <=#1 32'h00000006; // MIT_NUMCIL
+            tables.mit[0006] <=#1 32'h00000000; // MIT_FIRSTCIL
             // BasicClass:.ctor
-            tables.mit[0007] <= 32'h00000001; // MIT_ID
-            tables.mit[0008] <= 32'h00000000; // MIT_CIT_ID (foreign [key])
-            tables.mit[0009] <= 32'h00000001; // MIT_NUMARGS
-            tables.mit[0010] <= 32'h00000000; // MIT_NUMLOCALS
-            tables.mit[0011] <= 32'h00000008; // MIT_MAXEVALSTACK
-            tables.mit[0012] <= 32'h00000001; // MIT_NUMCIL
-            tables.mit[0013] <= 32'h00000012; // MIT_FIRSTCIL
+            tables.mit[0007] <=#1 32'h00000001; // MIT_ID
+            tables.mit[0008] <=#1 32'h00000000; // MIT_CIT_ID (foreign [key])
+            tables.mit[0009] <=#1 32'h00000001; // MIT_NUMARGS
+            tables.mit[0010] <=#1 32'h00000000; // MIT_NUMLOCALS
+            tables.mit[0011] <=#1 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0012] <=#1 32'h00000001; // MIT_NUMCIL
+            tables.mit[0013] <=#1 32'h00000012; // MIT_FIRSTCIL
             // BasicClass:Method1
-            tables.mit[0014] <= 32'h00000002; // MIT_ID
-            tables.mit[0015] <= 32'h00000000; // MIT_CIT_ID (foreign [key])
-            tables.mit[0016] <= 32'h00000002; // MIT_NUMARGS
-            tables.mit[0017] <= 32'h00000002; // MIT_NUMLOCALS
-            tables.mit[0018] <= 32'h00000008; // MIT_MAXEVALSTACK
-            tables.mit[0019] <= 32'h00000003; // MIT_NUMCIL
-            tables.mit[0020] <= 32'h00000015; // MIT_FIRSTCIL
+            tables.mit[0014] <=#1 32'h00000002; // MIT_ID
+            tables.mit[0015] <=#1 32'h00000000; // MIT_CIT_ID (foreign [key])
+            tables.mit[0016] <=#1 32'h00000002; // MIT_NUMARGS
+            tables.mit[0017] <=#1 32'h00000002; // MIT_NUMLOCALS
+            tables.mit[0018] <=#1 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0019] <=#1 32'h00000003; // MIT_NUMCIL
+            tables.mit[0020] <=#1 32'h00000015; // MIT_FIRSTCIL
             // BasicClass:Method2
-            tables.mit[0021] <= 32'h00000003; // MIT_ID
-            tables.mit[0022] <= 32'h00000000; // MIT_CIT_ID (foreign [key])
-            tables.mit[0023] <= 32'h00000000; // MIT_NUMARGS
-            tables.mit[0024] <= 32'h00000001; // MIT_NUMLOCALS
-            tables.mit[0025] <= 32'h00000008; // MIT_MAXEVALSTACK
-            tables.mit[0026] <= 32'h00000003; // MIT_NUMCIL
+            tables.mit[0021] <=#1 32'h00000003; // MIT_ID
+            tables.mit[0022] <=#1 32'h00000000; // MIT_CIT_ID (foreign [key])
+            tables.mit[0023] <=#1 32'h00000000; // MIT_NUMARGS
+            tables.mit[0024] <=#1 32'h00000001; // MIT_NUMLOCALS
+            tables.mit[0025] <=#1 32'h00000008; // MIT_MAXEVALSTACK
+            tables.mit[0026] <=#1 32'h00000003; // MIT_NUMCIL
             tables.mit[0027] <= 32'h0000001E; // MIT_FIRSTCIL
             // mit names records:[0]MIT_ID_NAME
-            tables.mit_names[00000000] <= "noname";                   // MIT_ID_NAME
-            tables.mit_names[00000001] <= "BasicClass:main";          // MIT_ID_NAME
-            tables.mit_names[00000002] <= "BasicClass:.ctor";         // MIT_ID_NAME
-            tables.mit_names[00000003] <= "BasicClass:Method1";       // MIT_ID_NAME
-            tables.mit_names[00000004] <= "BasicClass:Method2";       // MIT_ID_NAME
+            tables.mit_names[00000000] <=#1 "noname";                   // MIT_ID_NAME
+            tables.mit_names[00000001] <=#1 "BasicClass:main";          // MIT_ID_NAME
+            tables.mit_names[00000002] <=#1 "BasicClass:.ctor";         // MIT_ID_NAME
+            tables.mit_names[00000003] <=#1 "BasicClass:Method1";       // MIT_ID_NAME
+            tables.mit_names[00000004] <=#1 "BasicClass:Method2";       // MIT_ID_NAME
             
             // --------------------------------------------------------------------------
             // cil records: [0]CIL_ID
                          // [1]CIL_OPCODE
                          // [2]CIL_OPERAND
             // BasicClass : main : rva 0x00000250
-            tables.cil[0000] <= 32'h00000000;      // CIL_ID
-            tables.cil[0001] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-            tables.cil[0002] <= 32'h00000005;      // CIL_OPERAND:     5
+            tables.cil[0000] <=#1 32'h00000000;      // CIL_ID
+            tables.cil[0001] <=#1 32'h00000020;      // CIL_OPCODE:      ldc.i4
+            tables.cil[0002] <=#1 32'h00000005;      // CIL_OPERAND:     5
             // BasicClass : main : rva 0x00000250
-            tables.cil[0003] <= 32'h00000001;      // CIL_ID
-            tables.cil[0004] <= 32'h00000073;      // CIL_OPCODE:      newobj
-            tables.cil[0005] <= 32'h06000002;      // CIL_OPERAND:     100663298
+            tables.cil[0003] <=#1 32'h00000001;      // CIL_ID
+            tables.cil[0004] <=#1 32'h00000073;      // CIL_OPCODE:      newobj
+            tables.cil[0005] <=#1 32'h06000002;      // CIL_OPERAND:     100663298
             // BasicClass : main : rva 0x00000250
-            tables.cil[0006] <= 32'h00000002;      // CIL_ID
-            tables.cil[0007] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-            tables.cil[0008] <= 32'h0000000A;      // CIL_OPERAND:     10
+            tables.cil[0006] <=#1 32'h00000002;      // CIL_ID
+            tables.cil[0007] <=#1 32'h00000020;      // CIL_OPCODE:      ldc.i4
+            tables.cil[0008] <=#1 32'h0000000A;      // CIL_OPERAND:     10
             // BasicClass : main : rva 0x00000250
-            tables.cil[0009] <= 32'h00000003;      // IL_ID
-            tables.cil[0010] <= 32'h00000020;      // CIL_OPCODE:      ldc.i4
-            tables.cil[0011] <= 32'h00000014;      // CIL_OPERAND:     20
+            tables.cil[0009] <=#1 32'h00000003;      // IL_ID
+            tables.cil[0010] <=#1 32'h00000020;      // CIL_OPCODE:      ldc.i4
+            tables.cil[0011] <=#1 32'h00000014;      // CIL_OPERAND:     20
             // BasicClass : main : rva 0x00000250
-            tables.cil[0012] <= 32'h00000004;      // CIL_ID
-            tables.cil[0013] <= 32'h00000028;      // CIL_OPCODE:      call
-            tables.cil[0014] <= 32'h06000003;      // CIL_OPERAND:     100663299
+            tables.cil[0012] <=#1 32'h00000004;      // CIL_ID
+            tables.cil[0013] <=#1 32'h00000028;      // CIL_OPCODE:      call
+            tables.cil[0014] <=#1 32'h06000003;      // CIL_OPERAND:     100663299
             // BasicClass : main : rva 0x00000250
-            tables.cil[0015] <= 32'h00000005;      // CIL_ID
-            tables.cil[0016] <= 32'h0000002A;      // CIL_OPCODE:      ret
-            tables.cil[0017] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0015] <=#1 32'h00000005;      // CIL_ID
+            tables.cil[0016] <=#1 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0017] <=#1 32'h00000000;      // CIL_OPERAND:     0
             // BasicClass : .ctor : rva 0x0000026b
-            tables.cil[0018] <= 32'h00000006;      // CIL_ID
-            tables.cil[0019] <= 32'h0000002A;      // CIL_OPCODE:      ret
-            tables.cil[0020] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0018] <=#1 32'h00000006;      // CIL_ID
+            tables.cil[0019] <=#1 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0020] <=#1 32'h00000000;      // CIL_OPERAND:     0
             // BasicClass : Method1 : rva 0x00000270
-            tables.cil[0021] <= 32'h00000007;      // CIL_ID
-            tables.cil[0022] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
-            tables.cil[0023] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0021] <=#1 32'h00000007;      // CIL_ID
+            tables.cil[0022] <=#1 32'h00000006;      // CIL_OPCODE:      ldloc.0
+            tables.cil[0023] <=#1 32'h00000000;      // CIL_OPERAND:     0
             // BasicClass : Method1 : rva 0x00000270
-            tables.cil[0024] <= 32'h00000008;      // CIL_ID
-            tables.cil[0025] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
-            tables.cil[0026] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0024] <=#1 32'h00000008;      // CIL_ID
+            tables.cil[0025] <=#1 32'h0000000A;      // CIL_OPCODE:      stloc.0
+            tables.cil[0026] <=#1 32'h00000000;      // CIL_OPERAND:     0
             // BasicClass : Method1 : rva 0x00000270
-            tables.cil[0027] <= 32'h00000009;      // CIL_ID
-            tables.cil[0028] <= 32'h0000002A;      // CIL_OPCODE:      ret
-            tables.cil[0029] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0027] <=#1 32'h00000009;      // CIL_ID
+            tables.cil[0028] <=#1 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0029] <=#1 32'h00000000;      // CIL_OPERAND:     0
             // BasicClass : Method2 : rva 0x00000280
-            tables.cil[0030] <= 32'h0000000A;      // CIL_ID
-            tables.cil[0031] <= 32'h00000006;      // CIL_OPCODE:      ldloc.0
-            tables.cil[0032] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0030] <=#1 32'h0000000A;      // CIL_ID
+            tables.cil[0031] <=#1 32'h00000006;      // CIL_OPCODE:      ldloc.0
+            tables.cil[0032] <=#1 32'h00000000;      // CIL_OPERAND:     0
             // BasicClass : Method2 : rva 0x00000280
-            tables.cil[0033] <= 32'h0000000B;      // CIL_ID
-            tables.cil[0034] <= 32'h0000000A;      // CIL_OPCODE:      stloc.0
-            tables.cil[0035] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0033] <=#1 32'h0000000B;      // CIL_ID
+            tables.cil[0034] <=#1 32'h0000000A;      // CIL_OPCODE:      stloc.0
+            tables.cil[0035] <=#1 32'h00000000;      // CIL_OPERAND:     0
             // BasicClass : Method2 : rva 0x00000280
-            tables.cil[0036] <= 32'h0000000C;      // CIL_ID
-            tables.cil[0037] <= 32'h0000002A;      // CIL_OPCODE:      ret
-            tables.cil[0038] <= 32'h00000000;      // CIL_OPERAND:     0
+            tables.cil[0036] <=#1 32'h0000000C;      // CIL_ID
+            tables.cil[0037] <=#1 32'h0000002A;      // CIL_OPCODE:      ret
+            tables.cil[0038] <=#1 32'h00000000;      // CIL_OPERAND:     0
         end  
     endtask        
 
@@ -1018,30 +1036,30 @@ module fop
     // mitId is the method id, and "this" is the identifier for the new instance (or just 0 if it is a static method)
     task createStackFrame(input [31:0] mit_id, input [31:0] this_id);
         begin
-            stack.slot[stack.nsfp + stack.SF_MIT_ID]  <= mit_id;
-            stack.slot[stack.nsfp + stack.SF_CIT_ID]  <= 32'h0; // Only one class so far
-            stack.slot[stack.nsfp + stack.SF_THIS_ID] <= this_id; // 0 if static method          
-            stack.slot[stack.nsfp + stack.SF_ARGS]    <= 32'h4;   // 4 hardcoded
-            stack.slot[stack.nsfp + stack.SF_LOCS]    <= 32'h4;   // 4 hardcoded
-            stack.slot[stack.nsfp + stack.SF_LR]      <= stack.lr;
-            stack.slot[stack.nsfp + stack.SF_ARG_0]   <= 32'h0;
-            stack.slot[stack.nsfp + stack.SF_ARG_1]   <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_ARG_2]   <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_ARG_3]   <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_0]   <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_1]   <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_2]   <= 32'h0;          
-            stack.slot[stack.nsfp + stack.SF_LOC_3]   <= 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_MIT_ID]  <=#1 mit_id;
+            stack.slot[stack.nsfp + stack.SF_CIT_ID]  <=#1 32'h0; // Only one class so far
+            stack.slot[stack.nsfp + stack.SF_THIS_ID] <=#1 this_id; // 0 if static method          
+            stack.slot[stack.nsfp + stack.SF_ARGS]    <=#1 32'h4;   // 4 hardcoded
+            stack.slot[stack.nsfp + stack.SF_LOCS]    <=#1 32'h4;   // 4 hardcoded
+            stack.slot[stack.nsfp + stack.SF_LR]      <=#1 stack.lr;
+            stack.slot[stack.nsfp + stack.SF_ARG_0]   <=#1 32'h0;
+            stack.slot[stack.nsfp + stack.SF_ARG_1]   <=#1 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_ARG_2]   <=#1 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_ARG_3]   <=#1 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_0]   <=#1 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_1]   <=#1 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_2]   <=#1 32'h0;          
+            stack.slot[stack.nsfp + stack.SF_LOC_3]   <=#1 32'h0;          
 
             // Arguments slots
             copyWords(evalstack.esp, stack.nsfp, 32'h4);
             // Locals slots
             copyWords(evalstack.esp + 32'h4, stack.nsfp + 32'h4, 32'h4);
             // Increment stack frame pointers
-            stack.sfp     <= stack.nsfp;
-            stack.nsfp    <= stack.nsfp + stack.SF_SIZE;
+            stack.sfp     <=#1 stack.nsfp;
+            stack.nsfp    <=#1stack.nsfp + stack.SF_SIZE;
             // esp reset (but it is a full stack)
-            evalstack.esp <= 32'h0;
+            evalstack.esp <=#1 32'h0;
         end
     endtask    
 
@@ -1056,12 +1074,12 @@ module fop
     // If this = 0, then it is a static class, otherwise an instance.
     task createHeapFrame(input [31:0] cit_id, input [31:0] this_id);
         begin
-            heap.slot[heap.nhfp + heap.HF_THIS_ID]  <= this_id; // 0 means static
-            heap.slot[heap.nhfp + heap.HF_CIT_ID]   <= cit_id; 
-            heap.slot[heap.nhfp + heap.HF_FLD_0]    <= 32'h0;
-            heap.slot[heap.nhfp + heap.HF_FLD_1]    <= 32'h0;
-            heap.slot[heap.nhfp + heap.HF_FLD_2]    <= 32'h0;
-            heap.slot[heap.nhfp + heap.HF_FLD_3]    <= 32'h0;
+            heap.slot[heap.nhfp + heap.HF_THIS_ID]  <=#1 this_id; // 0 means static
+            heap.slot[heap.nhfp + heap.HF_CIT_ID]   <=#1 cit_id; 
+            heap.slot[heap.nhfp + heap.HF_FLD_0]    <=#1 32'h0;
+            heap.slot[heap.nhfp + heap.HF_FLD_1]    <=#1 32'h0;
+            heap.slot[heap.nhfp + heap.HF_FLD_2]    <=#1 32'h0;
+            heap.slot[heap.nhfp + heap.HF_FLD_3]    <=#1 32'h0;
             heap.hfp  <= heap.nhfp;
             heap.nhfp <= heap.nhfp + heap.HF_SIZE;
         end
@@ -1305,8 +1323,8 @@ module fop
         begin
             $display("LDNULLx14_task(), evalstack[esp=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp]); 
             // The offset is also dependent on the number of arguments for this mid
-            evalstack.slot[evalstack.esp + 32'h1] <= 32'h0; // 0 ok as null?
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp + 32'h1] <=#1 32'h0; // 0 ok as null?
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -1316,8 +1334,8 @@ module fop
         begin
             $display("LDCI4M1x15_task(), evalstack[esp=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp]); 
             // The offset is also dependent on the number of arguments for this mid
-            evalstack.slot[evalstack.esp + 32'h1] <= 32'hFFFFFFFF; // -1?
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp + 32'h1] <=#1 32'hFFFFFFFF; // -1?
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -1424,9 +1442,9 @@ module fop
         begin
            $display("LDCI4x20_task(input [31:0] in=0x%x), esp=0x%x", in, evalstack.esp);
            // push i4 value to new tos
-           evalstack.slot[evalstack.esp + 32'h1] <= in;
+           evalstack.slot[evalstack.esp + 32'h1] <=#1 in;
            // adjust esp (??? <=)
-           evalstack.esp <= evalstack.esp + 32'h1;
+           evalstack.esp <=#1 evalstack.esp + 32'h1;
            nextInstruction();
         end            
     endtask
@@ -1436,8 +1454,8 @@ module fop
         begin
             $display("LDCI8x21_task(input [31:0] in=0x%x), esp=0x%x", in, evalstack.esp);
             // push "i8" value to new tos
-            evalstack.slot[evalstack.esp + 32'h2]  <= 32'h0;
-            evalstack.slot[evalstack.esp + 32'h1]  <= in;
+            evalstack.slot[evalstack.esp + 32'h2]  <=#1 32'h0;
+            evalstack.slot[evalstack.esp + 32'h1]  <=#1 in;
             // adjust esp
             evalstack.esp <= evalstack.esp + 32'h2;
             nextInstruction();
@@ -1449,9 +1467,9 @@ module fop
         begin
             $display("LDCR4x22_task(input [31:0] r4=0x%x), esp=0x%x", r4, evalstack.esp);
             // push r4 value to new tos
-            evalstack.slot[evalstack.esp + 32'h1]  <= r4;
+            evalstack.slot[evalstack.esp + 32'h1]  <=#1 r4;
             // adjust esp
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -1461,8 +1479,8 @@ module fop
         begin
             $display("LDCR8x23_task(input [31:0] r8=0x%x), esp=0x%x", r8, evalstack.esp);
             // push "r8" value to new tos
-            evalstack.slot[evalstack.esp + 32'h2]  <= 32'h0;
-            evalstack.slot[evalstack.esp + 32'h1]  <= r8;
+            evalstack.slot[evalstack.esp + 32'h2]  <=#1 32'h0;
+            evalstack.slot[evalstack.esp + 32'h1]  <=#1 r8;
             // adjust esp
             evalstack.esp <= evalstack.esp + 32'h2;
             nextInstruction();
@@ -1473,9 +1491,9 @@ module fop
     task DUPx25_task();
         begin
             $display("DUPx25_task()");
-            evalstack.slot[evalstack.esp + 32'h1]  <= evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp + 32'h1]  <=#1 evalstack.slot[evalstack.esp];
             // adjust esp
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -1484,9 +1502,9 @@ module fop
     task POPx26_task();
         begin
             $display("POPx26_task()");
-            evalstack.slot[evalstack.esp] <= 32'bx;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
             // adjust esp
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();            
         end
     endtask
@@ -1534,12 +1552,12 @@ module fop
             if (evalstack.slot[evalstack.esp] == 32'h0)
                begin
                    $display("BRFALSE: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h1;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h1;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -1551,12 +1569,12 @@ module fop
             if (evalstack.slot[evalstack.esp] != 32'h0)
                begin
                    $display("BRTRUE: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h1;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h1;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -1568,14 +1586,14 @@ module fop
             if (evalstack.slot[evalstack.esp] == evalstack.slot[evalstack.esp-32'h1])
                begin
                    $display("BEQS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction();
         end
     endtask
@@ -1587,14 +1605,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] >= evalstack.slot[evalstack.esp])
                begin
                    $display("BEQS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction();            
         end
     endtask
@@ -1606,14 +1624,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] > evalstack.slot[evalstack.esp])
                begin
                    $display("BGT: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction();  
         end
     endtask
@@ -1625,14 +1643,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] <= evalstack.slot[evalstack.esp])
                begin
                    $display("BLES: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction(); 
         end
     endtask
@@ -1644,14 +1662,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] < evalstack.slot[evalstack.esp])
                begin
                    $display("BLTS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction(); 
         end
     endtask
@@ -1663,14 +1681,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] != evalstack.slot[evalstack.esp])
                begin
                    $display("BNEUNS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction(); 
         end
     endtask
@@ -1682,14 +1700,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] >= evalstack.slot[evalstack.esp])
                begin
                    $display("BGEUNS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction(); 
         end
     endtask
@@ -1701,14 +1719,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] > evalstack.slot[evalstack.esp])
                begin
                    $display("BGTUNS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction();             
         end
     endtask
@@ -1720,14 +1738,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] <= evalstack.slot[evalstack.esp])
                begin
                    $display("BLEUNS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction(); 
         end
     endtask
@@ -1739,14 +1757,14 @@ module fop
             if (evalstack.slot[evalstack.esp-32'h1] < evalstack.slot[evalstack.esp])
                begin
                    $display("BLTUNS: Calling BRx38_task");
-                   evalstack.slot[evalstack.esp] <= 32'bx;
-                   evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-                   evalstack.esp <= evalstack.esp - 32'h2;
+                   evalstack.slot[evalstack.esp] <=#1 32'bx;
+                   evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+                   evalstack.esp <=#1 evalstack.esp - 32'h2;
                    BRx38_task(target); 
                end 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction();
         end
     endtask
@@ -1757,7 +1775,7 @@ module fop
    task BRx38_task(input signed [31:0] target);
        begin
            $display("BRx38_task(input signed [31:0] target=0x%x), pc=0x%x", target, stack.pc);
-           stack.pc <= stack.pc + target;
+           stack.pc <=#1 stack.pc + target;
        end
    endtask
     
@@ -2030,9 +2048,9 @@ module fop
     task ADDx58_task(input carryIn);
         begin
             $display("ADDx58_task(input carryIn)=%d), esp=0x%x", carryIn, evalstack.esp);
-            evalstack.slot[evalstack.esp - 1'b1] <= carryIn + evalstack.slot[evalstack.esp] + evalstack.slot[evalstack.esp - 1'b1]; 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 1'b1;
+            evalstack.slot[evalstack.esp - 1'b1] <=#1 carryIn + evalstack.slot[evalstack.esp] + evalstack.slot[evalstack.esp - 1'b1]; 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 1'b1;
             nextInstruction();
         end
     endtask
@@ -2041,9 +2059,9 @@ module fop
     task SUBx59_task();
         begin
             $display("SUBx59_task()");
-            evalstack.slot[evalstack.esp - 32'h1] <= evalstack.slot[evalstack.esp] + evalstack.slot[evalstack.esp - 32'h1]; 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 evalstack.slot[evalstack.esp] + evalstack.slot[evalstack.esp - 32'h1]; 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2052,9 +2070,9 @@ module fop
     task MULx5A_task();
         begin
             $display("MULx5A_task()");
-            evalstack.slot[evalstack.esp - 32'h1] <= evalstack.slot[evalstack.esp] * evalstack.slot[evalstack.esp - 32'h1]; 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 evalstack.slot[evalstack.esp] * evalstack.slot[evalstack.esp - 32'h1]; 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2063,9 +2081,9 @@ module fop
     task DIVx5B_task();
         begin
             $display("DIVx5B_task()");
-            evalstack.slot[evalstack.esp - 32'h1] <= evalstack.slot[evalstack.esp] / evalstack.slot[evalstack.esp - 32'h1]; 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 evalstack.slot[evalstack.esp] / evalstack.slot[evalstack.esp - 32'h1]; 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2082,9 +2100,9 @@ module fop
     task REMx5D_task();
         begin
             $display("REMx5D_task()");
-            evalstack.slot[evalstack.esp - 32'h1] <= evalstack.slot[evalstack.esp]-(evalstack.slot[evalstack.esp]*(evalstack.slot[evalstack.esp] / evalstack.slot[evalstack.esp - 32'h1])); 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 evalstack.slot[evalstack.esp]-(evalstack.slot[evalstack.esp]*(evalstack.slot[evalstack.esp] / evalstack.slot[evalstack.esp - 32'h1])); 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2101,9 +2119,9 @@ module fop
     task ANDx5F_task();
         begin
             $display("ANDx5F_task()");
-            evalstack.slot[evalstack.esp - 32'h1] <= evalstack.slot[evalstack.esp] & evalstack.slot[evalstack.esp - 32'h1]; 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 evalstack.slot[evalstack.esp] & evalstack.slot[evalstack.esp - 32'h1]; 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2112,9 +2130,9 @@ module fop
     task ORx60_task();
         begin
             $display("ORx60_task()");
-            evalstack.slot[evalstack.esp - 32'h1] <= evalstack.slot[evalstack.esp] | evalstack.slot[evalstack.esp - 32'h1]; 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 evalstack.slot[evalstack.esp] | evalstack.slot[evalstack.esp - 32'h1]; 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2123,9 +2141,9 @@ module fop
     task XORx61_task();
         begin
             $display("XORx61_task()");
-            evalstack.slot[evalstack.esp - 32'h1] <= evalstack.slot[evalstack.esp] ^ evalstack.slot[evalstack.esp - 32'h1]; 
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 evalstack.slot[evalstack.esp] ^ evalstack.slot[evalstack.esp - 32'h1]; 
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2136,9 +2154,9 @@ module fop
         begin
             $display("SHLx62_task()");
             $display("shiftAmount=evalstack[esp=%d]=0x%x, value=evalstack[esp-1=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp], evalstack.esp-32'h1, evalstack.slot[evalstack.esp-32'h1]);
-            evalstack.slot[evalstack.esp-32'h1] <= evalstack.slot[evalstack.esp-32'h1] << evalstack.slot[evalstack.esp];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 evalstack.slot[evalstack.esp-32'h1] << evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2148,9 +2166,9 @@ module fop
         begin
             $display("SHRx63_task()");
             $display("shiftAmount=evalstack[esp=%d]=0x%x, value=evalstack[esp-1=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp], evalstack.esp-32'h1, evalstack.slot[evalstack.esp-32'h1]);
-            evalstack.slot[evalstack.esp-32'h1] <= evalstack.slot[evalstack.esp-32'h1] >> evalstack.slot[evalstack.esp];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 evalstack.slot[evalstack.esp-32'h1] >> evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2167,7 +2185,7 @@ module fop
     task NEGx65_task();
         begin
             $display("NEGx65_task()");
-            evalstack.slot[evalstack.esp] <= 0 - evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 0 - evalstack.slot[evalstack.esp];
             nextInstruction();
         end
     endtask
@@ -2176,7 +2194,7 @@ module fop
     task NOTx66_task();
         begin
             $display("NOTx66_task()");
-            evalstack.slot[evalstack.esp] <= !evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 !evalstack.slot[evalstack.esp];
             nextInstruction();
         end
     endtask
@@ -2257,7 +2275,7 @@ module fop
     task LDFLDx7B_task(input [31:0] fldIndx);
         begin
             // pop and push
-            evalstack.slot[evalstack.esp+32'h0] <= heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
+            evalstack.slot[evalstack.esp+32'h0] <=#1 heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
             nextInstruction();
         end
     endtask 
@@ -2523,10 +2541,10 @@ module fop
     task STINDIxDF_task();
         begin
             $display("STINDIxDF_task()");
-            evalstack.slot[evalstack.slot[evalstack.esp-32'h1]] <= evalstack.slot[evalstack.esp];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            evalstack.slot[evalstack.slot[evalstack.esp-32'h1]] <=#1 evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction();
         end
     endtask
@@ -2545,14 +2563,14 @@ module fop
             $display("CEQxFE01_task()");
             if (evalstack.slot[evalstack.esp-32'h1] == evalstack.slot[evalstack.esp])
                 begin
-                    evalstack.slot[evalstack.esp-32'h1] <= 32'h1;
+                    evalstack.slot[evalstack.esp-32'h1] <=#1 32'h1;
                 end
             else
                 begin
-                    evalstack.slot[evalstack.esp-32'h1] <= 32'h0;
+                    evalstack.slot[evalstack.esp-32'h1] <=#1 32'h0;
                 end
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2561,8 +2579,8 @@ module fop
     task ARGLISTxFE00_task();
         begin
             $display("ARGLISTxFE00_task()");
-            evalstack.slot[evalstack.esp+32'h1] <= 32'h99999999;
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp+32'h1] <=#1 32'h99999999;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -2573,14 +2591,14 @@ module fop
             $display("CGTxFE02_task()");
             if (evalstack.slot[evalstack.esp-32'h1] > evalstack.slot[evalstack.esp])
                 begin
-                    evalstack.slot[evalstack.esp-32'h1] <= 32'h1;
+                    evalstack.slot[evalstack.esp-32'h1] <=#1 32'h1;
                 end
             else
                 begin
-                    evalstack.slot[evalstack.esp-32'h1] <= 32'h0;
+                    evalstack.slot[evalstack.esp-32'h1] <=#1 32'h0;
                 end
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2599,14 +2617,14 @@ module fop
             $display("CLTxFE04_task()");
             if (evalstack.slot[evalstack.esp-32'h1] < evalstack.slot[evalstack.esp])
                 begin
-                    evalstack.slot[evalstack.esp-32'h1] <= 32'h1;
+                    evalstack.slot[evalstack.esp-32'h1] <=#1 32'h1;
                 end
             else
                 begin
-                    evalstack.slot[evalstack.esp-32'h1] <= 32'h0;
+                    evalstack.slot[evalstack.esp-32'h1] <=#1 32'h0;
                 end
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();            
         end
     endtask
@@ -2623,8 +2641,8 @@ module fop
     task LDFTNxFE06_task();
         begin
             $display("LDFTNxFE06_task()");
-            evalstack.slot[evalstack.esp+32'h1] <= 32'h99999999;
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp+32'h1] <=#1 32'h99999999;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -2634,8 +2652,8 @@ module fop
     task LDARGxFE09_task(input [31:0] argIndex);
         begin
            $display("LDARGxFE09_task(input [31:0] argIndex=%d), stack[%d]=0x%x, esp=0x%x", argIndex, argIndex, stack.slot[stack.sfp + stack.SF_SIZE + argIndex], evalstack.esp); 
-           evalstack.slot[evalstack.esp + 32'h1] <= stack.slot[stack.sfp + stack.SF_SIZE + argIndex];
-           evalstack.esp <= evalstack.esp + 32'h1;
+           evalstack.slot[evalstack.esp + 32'h1] <=#1 stack.slot[stack.sfp + stack.SF_SIZE + argIndex];
+           evalstack.esp <=#1 evalstack.esp + 32'h1;
            nextInstruction();
         end
     endtask  
@@ -2644,8 +2662,8 @@ module fop
     task LDARGAxFE0A_task(input [31:0] argIndex);
         begin
             $display("LDARGAxFE0A_task(input [31:0] argIndex=%d), stack[%d]=0x%x, esp=0x%x", argIndex, argIndex, stack.slot[stack.sfp + stack.SF_SIZE + argIndex], evalstack.esp); 
-            evalstack.slot[evalstack.esp + 32'h1] <= stack.sfp + stack.SF_SIZE + argIndex;
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp + 32'h1] <=#1 stack.sfp + stack.SF_SIZE + argIndex;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -2654,9 +2672,9 @@ module fop
     task STARGxFE0B_task(input [31:0] argIndex);
         begin
             $display("STARGxFE0B_task(input [31:0] argIndex=%d), stack[%d]=0x%x, esp=0x%x", argIndex, argIndex, stack.slot[stack.sfp + stack.SF_SIZE + argIndex], evalstack.esp); 
-            stack.slot[stack.sfp + stack.SF_SIZE + argIndex] <= evalstack.slot[evalstack.esp];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            stack.slot[stack.sfp + stack.SF_SIZE + argIndex] <=#1 evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2665,8 +2683,8 @@ module fop
     task ENDFILTERxFE11_task();
         begin
             $display("ENDFILTERxFE11_task()");
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2675,11 +2693,11 @@ module fop
     task CPBLKxFE17_task();
         begin
             $display("CPBLKxFE17_task()");
-            stack.slot[evalstack.slot[evalstack.esp-32'h2]] <= stack.slot[evalstack.slot[evalstack.esp-32'h1]];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h2] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h3;
+            stack.slot[evalstack.slot[evalstack.esp-32'h2]] <=#1 stack.slot[evalstack.slot[evalstack.esp-32'h1]];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h2] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h3;
             nextInstruction();
         end
     endtask
@@ -2688,11 +2706,11 @@ module fop
     task INITBLKxFE18_task();
         begin
             $display("INITBLKxFE18_task()");
-            stack.slot[evalstack.slot[evalstack.esp-32'h2]] <= evalstack.slot[evalstack.esp-32'h1];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h1] <= 32'bx;
-            evalstack.slot[evalstack.esp-32'h2] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h3;
+            stack.slot[evalstack.slot[evalstack.esp-32'h2]] <=#1 evalstack.slot[evalstack.esp-32'h1];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 32'bx;
+            evalstack.slot[evalstack.esp-32'h2] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h3;
             nextInstruction();
         end
     endtask
@@ -2704,10 +2722,10 @@ module fop
             logic [31:0] mit_numlocals; // Number of locals
             $display("LDLOCxFE0C_task(input login [31:0] locIndx=%d), evalstack[esp=%d]=0x%x", locIndx, evalstack.esp, evalstack.slot[evalstack.esp]); 
             // The offset is also dependent on the number of arguments for this mid
-            mit_numargs <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
-            mit_numlocals <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
-            evalstack.slot[evalstack.esp + 32'h1] <= stack.slot[stack.sfp + stack.SF_SIZE + mit_numargs + locIndx] ;
-            evalstack.esp <= evalstack.esp + 32'h1;
+            mit_numargs <=#1 tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
+            mit_numlocals <=#1 tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
+            evalstack.slot[evalstack.esp + 32'h1] <=#1 stack.slot[stack.sfp + stack.SF_SIZE + mit_numargs + locIndx] ;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -2719,10 +2737,10 @@ module fop
             logic [31:0] mit_numlocals; // Number of locals
             $display("LDLOCAxFE0D_task(input login [31:0] locIndx=%d), evalstack[esp=%d]=0x%x", locIndx, evalstack.esp, evalstack.slot[evalstack.esp]);
             // The offset is also dependent on the number of arguments for this mid
-            mit_numargs <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
-            mit_numlocals <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
-            evalstack.slot[evalstack.esp + 32'h1] <= stack.sfp + stack.SF_SIZE + mit_numargs + locIndx;
-            evalstack.esp <= evalstack.esp + 32'h1;
+            mit_numargs <=#1 tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
+            mit_numlocals <=#1 tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
+            evalstack.slot[evalstack.esp + 32'h1] <=#1 stack.sfp + stack.SF_SIZE + mit_numargs + locIndx;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -2735,11 +2753,11 @@ module fop
            logic [31:0] mit_numlocals; // Number of locals
            $display("STLOCxFE0E_task(input login [31:0] locIndx=%d), evalstack[esp=%d]=0x%x", locIndx, evalstack.esp, evalstack.slot[evalstack.esp]); 
            // The offset is also dependent on the number of arguments for this mid
-           mit_numargs <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
-           mit_numlocals <= tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
-           stack.slot[stack.sfp + stack.SF_SIZE + mit_numargs + locIndx] <= evalstack.slot[evalstack.esp];
-           evalstack.slot[evalstack.esp] <= 32'bx;
-           evalstack.esp <= evalstack.esp - 32'h1;
+           mit_numargs <=#1 tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMARGS]; // Number of arguments
+           mit_numlocals <=#1 tables.mit[stack.mit_id * tables.MIT_SIZE + tables.MIT_NUMLOCALS]; // Number of locals
+           stack.slot[stack.sfp + stack.SF_SIZE + mit_numargs + locIndx] <=#1 evalstack.slot[evalstack.esp];
+           evalstack.slot[evalstack.esp] <=#1 32'bx;
+           evalstack.esp <=#1 evalstack.esp - 32'h1;
            nextInstruction();
         end
     endtask
@@ -2748,7 +2766,7 @@ module fop
     task LOCALLOCxFE0F_task();
         begin
             $display("LOCALLOCxFE0F_task()");
-            evalstack.slot[evalstack.esp] <= evalstack.slot[evalstack.esp] + stack.sfp + 32'h99999999;
+            evalstack.slot[evalstack.esp] <=#1 evalstack.slot[evalstack.esp] + stack.sfp + 32'h99999999;
             nextInstruction();
         end
     endtask
@@ -2806,11 +2824,11 @@ module fop
             logic [31:0] citIdValue;
             // ctorToken = x06000002
             $display("NEWOBJx73(input [31:0] ctorToken=0x%08x)", ctorToken);
-            ctor_mit_id <= (32'h00FFFFFF & ctorToken);
-            ctor_cit_id <= tables.mit[ctor_mit_id * tables.MIT_SIZE + tables.MIT_CIT_ID];
+            ctor_mit_id <=#1 (32'h00FFFFFF & ctorToken);
+            ctor_cit_id <=#1 tables.mit[ctor_mit_id * tables.MIT_SIZE + tables.MIT_CIT_ID];
             
             // Create the new instance heap frame with incremented "this"
-            heap.this_id <= heap.this_id + 32'h1;
+            heap.this_id <=#1 heap.this_id + 32'h1;
             createHeapFrame(32'h0, heap.this_id);            
             
             // Create the stackframe for .ctor
@@ -2836,10 +2854,10 @@ module fop
             $display("val=evalstack[esp=%d]=0x%x, obj=evalstack[esp-1=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp], evalstack.esp-32'h1, evalstack.slot[evalstack.esp-32'h1]);
 //TODO: Create lookup table obj=evalstack[esp-32'h1] -> hfp
             // Store val into the object field            
-            heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx] <= evalstack.slot[evalstack.esp];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp - 32'h1] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h2;
+            heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx] <=#1 evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h2;
             nextInstruction();
         end
     endtask
@@ -2851,9 +2869,9 @@ module fop
             $display("val=evalstack[esp=%d]=0x%x, obj=evalstack[esp-1=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp], evalstack.esp-32'h1, evalstack.slot[evalstack.esp-32'h1]);
 //TODO: Create lookup table obj=evalstack[esp-32'h1] -> hfp
             // Store val into the object field            
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp - 32'h1] <= heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2865,9 +2883,9 @@ module fop
             $display("val=evalstack[esp=%d]=0x%x, obj=evalstack[esp-1=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp], evalstack.esp-32'h1, evalstack.slot[evalstack.esp-32'h1]);
 //TODO: Create lookup table obj=evalstack[esp-32'h1] -> hfp
             // Store val into the object field            
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.slot[evalstack.esp - 32'h1] <= heap.hfp + heap.HF_FLD_0 + fldIndx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.slot[evalstack.esp - 32'h1] <=#1 heap.hfp + heap.HF_FLD_0 + fldIndx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2884,7 +2902,7 @@ module fop
     task ISINSTx75_task(input [31:0] inst);
         begin
             $display("ISINSTx75_task()");
-            evalstack.slot[evalstack.esp] <= inst; // wrong
+            evalstack.slot[evalstack.esp] <=#1 inst; // wrong
             nextInstruction();
         end
     endtask
@@ -2901,8 +2919,8 @@ module fop
     task THROWx7A_task();
         begin
             $display("THROWx7A_task()");
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();  
         end
     endtask
@@ -2914,8 +2932,8 @@ module fop
             $display("val=evalstack[esp=%d]=0x%x, obj=evalstack[esp-1=%d]=0x%x", evalstack.esp, evalstack.slot[evalstack.esp], evalstack.esp-32'h1, evalstack.slot[evalstack.esp-32'h1]);
 //TODO: Create lookup table obj=evalstack[esp-32'h1] -> hfp
             // Store val into the object field            
-            evalstack.slot[evalstack.esp + 32'h1] <= heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp + 32'h1] <=#1 heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -2927,9 +2945,9 @@ module fop
             //evalstack.slot[evalstack.esp] =evalstack[esp=%d]=0x%x, obj=evalstack[esp-1=%d]=0x%x", esp, evalstack.slot[evalstack.esp], esp-32'h1, evalstack[esp-32'h1]);
 //TODO: Create lookup table obj=evalstackevalstack.slot[evalstack.esp] hfp
             // Store val into the object field            
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx] <= evalstack.slot[evalstack.esp - 32'h1] <= heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx] <=#1 evalstack.slot[evalstack.esp - 32'h1] <= heap.slot[heap.hfp + heap.HF_FLD_0 + fldIndx];
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -2938,9 +2956,9 @@ module fop
     task STOBJx81_task(input [31:0] typeTok);
         begin
             $display("STOBJx81_task()");
-            evalstack.slot[evalstack.esp-32'h1] <= evalstack.slot[evalstack.esp];
-            evalstack.slot[evalstack.esp] <= 32'bx;
-            evalstack.esp <= evalstack.esp - 32'h1;
+            evalstack.slot[evalstack.esp-32'h1] <=#1 evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 32'bx;
+            evalstack.esp <=#1 evalstack.esp - 32'h1;
             nextInstruction();
         end
     endtask
@@ -3162,7 +3180,7 @@ module fop
     task REFANYVALxC2_task(input [31:0] aType);
         begin
             $display("REFANYVALxC2_task()");
-            evalstack.slot[evalstack.esp] <= aType;
+            evalstack.slot[evalstack.esp] <=#1 aType;
             nextInstruction();
         end
     endtask
@@ -3171,7 +3189,7 @@ module fop
     task MKREFANYxC6_task(input [31:0] aClass);
         begin
             $display("MKREFANYxC6_task()");
-            evalstack.slot[evalstack.esp] <= aClass;
+            evalstack.slot[evalstack.esp] <=#1 aClass;
             nextInstruction();
         end
     endtask
@@ -3180,8 +3198,8 @@ module fop
     task LDTOKENxD0_task(input [31:0] aToken);
         begin
             $display("LDTOKENxD0_task()");
-            evalstack.slot[evalstack.esp + 32'h1] <= aToken;
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp + 32'h1] <=#1 aToken;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -3190,7 +3208,7 @@ module fop
     task LDVIRTFNxFE07_task(input [31:0] aMethod);
         begin
             $display("LDVIRTFNxFE07_task()");
-            evalstack.slot[evalstack.esp] <= aMethod;
+            evalstack.slot[evalstack.esp] <=#1 aMethod;
             nextInstruction();
         end
     endtask
@@ -3216,8 +3234,8 @@ module fop
         begin
             $display("SIevalstack.slot[evalstack.esp]()");
             // ???
-            evalstack.slot[evalstack.esp+32'h1] <= 4;
-            evalstack.esp <= evalstack.esp + 32'h1;
+            evalstack.slot[evalstack.esp+32'h1] <=#1 4;
+            evalstack.esp <=#1 evalstack.esp + 32'h1;
             nextInstruction();
         end
     endtask
@@ -3226,7 +3244,7 @@ module fop
     task REFANYTYPExFE1D_task();
         begin
             $display("REFANYTYPExFE1D_task()");
-            evalstack.slot[evalstack.esp] <= evalstack.slot[evalstack.esp];
+            evalstack.slot[evalstack.esp] <=#1 evalstack.slot[evalstack.esp];
             nextInstruction();
         end
     endtask
@@ -3240,7 +3258,7 @@ module fop
             $display("");
             //$display("nextInstruction(): cid=%0d, mid=%0d", heap.cit_id, cls.prevcid, cls.mid);
             //$display("                   old pc=0x%0x, new pc=0x%0x", stack.pc, stack.pc + tables.CIL_SIZE);
-            stack.pc <= stack.pc + tables.CIL_SIZE;
+            stack.pc <=#1 stack.pc + tables.CIL_SIZE;
         end
     endtask
     
@@ -3260,25 +3278,25 @@ module fop
             if(cnt == 1)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d]=0x%0x", fromEIndex, evalstack.slot[fromEIndex]);
-                    stack.slot[toSIndex] <= evalstack.slot[fromEIndex];
+                    stack.slot[toSIndex] <=#1 evalstack.slot[fromEIndex];
                 end 
                   
             if(cnt == 2)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d+32'h1]=0x%0x", fromEIndex, evalstack.slot[fromEIndex+32'h1]);
-                    stack.slot[toSIndex+32'h1] <= evalstack.slot[fromEIndex+32'h1];
+                    stack.slot[toSIndex+32'h1] <=#1 evalstack.slot[fromEIndex+32'h1];
                 end
               
             if(cnt == 3)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d+32'h2]=0x%0x", fromEIndex, evalstack.slot[fromEIndex+32'h2]);
-                    evalstack.slot[toSIndex+32'h2] <= evalstack.slot[fromEIndex+32'h2];
+                    evalstack.slot[toSIndex+32'h2] <=#1 evalstack.slot[fromEIndex+32'h2];
                 end
             
             if(cnt == 4)
                 begin
                     $display("Copying evalstack[fromEIndex=%0d+32'h3]=0x%0x", fromEIndex, evalstack.slot[fromEIndex+32'h3]);
-                    evalstack.slot[toSIndex+32'h3] <= evalstack.slot[fromEIndex+32'h3];
+                    evalstack.slot[toSIndex+32'h3] <=#1 evalstack.slot[fromEIndex+32'h3];
                 end
         end
     endtask
@@ -3290,25 +3308,25 @@ module fop
          if(cnt == 1)
              begin
                  $display("Setting stack[startIndx=%d]=x%0x", startIndx, val);
-                 stack.slot[startIndx] <= val;
+                 stack.slot[startIndx] <=#1 val;
              end 
                
          if(cnt == 2)
              begin
                  $display("Setting stack[startIndx=%d]=0x%0x", startIndx+32'h1, val);
-                 stack.slot[startIndx+32'h1] <= val;
+                 stack.slot[startIndx+32'h1] <=#1 val;
              end
            
          if(cnt == 3)
              begin
                  $display("Setting stack[startIndx=%0d]=0x%0x", startIndx+32'h2, val);
-                 stack.slot[startIndx+32'h2] <= val;
+                 stack.slot[startIndx+32'h2] <=#1 val;
              end
          
          if(cnt == 4)
              begin
                  $display("Setting stack[startIndx=%0d]=0x%0x", startIndx+32'h3, val);
-                 stack.slot[startIndx+32'h3] <= val;
+                 stack.slot[startIndx+32'h3] <=#1 val;
              end
         end
     endtask
