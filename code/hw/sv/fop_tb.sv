@@ -12,7 +12,7 @@ module fop_tb;
 
     logic fop_reset;
     logic fop_enable;
-    fop fop_ (
+    fop fop (
                   .clk ( tb_clk),
                   .reset ( fop_reset ),
                   .enable ( fop_enable )    

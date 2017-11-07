@@ -312,9 +312,6 @@ module fop
         logic [8*20:1] cil_names [0:65535];// cil opnames (debug help)
     } tables;
     
-
-
-    
     ///////////////////////////////////////////////////////////////////////////
     // RUNTIME STRUCTS
     ///////////////////////////////////////////////////////////////////////////
@@ -363,10 +360,18 @@ module fop
     // EXECUTION 
     ///////////////////////////////////////////////////////////////////////////
     
-    // main loop
-    logic doPreInit;
-    logic doInit;
-    logic doLoad;
+    // main loop boot sequencer
+    typedef enum logic [1:0] {BOOTRESET, BOOTREADY, BOOTSET, BOOTGO} bootState_t;
+    bootState_t current_boot_state, next_boot_state;
+    always_comb begin
+        case (current_boot_state)
+            BOOTRESET : next_boot_state = BOOTREADY;
+            BOOTREADY : next_boot_state = BOOTSET;
+            BOOTSET   : next_boot_state = BOOTGO;
+            BOOTGO    : next_boot_state = BOOTGO;
+        endcase
+    end
+    
     always_ff @(posedge clk) begin
         $display("////////////////////////////////////////////////////////////////////////////////");
         $display("%0d is current time in main loop", $time);
@@ -374,29 +379,17 @@ module fop
         if (reset) 
             begin
                 $display("Reset()");
-                doPreInit <=#1 1'b1;
-                doInit    <=#1 1'b0;
-                doLoad    <=#1 1'b0;
+                current_boot_state <=#1 BOOTRESET;
             end
         else if (enable)
             begin
-                if (doPreInit) begin
-                    preInitOnReset();
-                    doPreInit <=#1 1'b0;
-                    doInit    <=#1 1'b1;
-                end
-                else if (doInit) begin
-                    initOnReset();
-                    doInit <=#1 1'b0;
-                    doLoad <=#1 1'b1;
-                end
-                else if (doLoad) begin
-                    load();
-                    doLoad <=#1 1'b0; 
-                end
-                else begin
-                    cilSwitch();
-                end
+                case (current_boot_state)
+                   BOOTRESET : preInitOnReset();
+                   BOOTREADY : initOnReset();
+                   BOOTSET   : load(); 
+                   BOOTGO    : cilSwitch(); 
+                endcase
+                current_boot_state <=#1 next_boot_state; // next bootstage
             end 
     end
     
@@ -1057,7 +1050,7 @@ module fop
             copyWords(evalstack.esp + 32'h4, stack.nsfp + 32'h4, 32'h4);
             // Increment stack frame pointers
             stack.sfp     <=#1 stack.nsfp;
-            stack.nsfp    <=#1stack.nsfp + stack.SF_SIZE;
+            stack.nsfp    <=#1 stack.nsfp + stack.SF_SIZE;
             // esp reset (but it is a full stack)
             evalstack.esp <=#1 32'h0;
         end
