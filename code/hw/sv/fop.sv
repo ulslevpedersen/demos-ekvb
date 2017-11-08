@@ -619,7 +619,7 @@ module fop
                 RETHROWxFE1A     : RETHROWxFE1A_task();
                 SIZEOFxFE1C      : SIZEOFxFE1C_task(tables.cil[stack.pc + 8'h2]);
                 REFANYTYPExFE1D  : REFANYTYPExFE1D_task();                     
-                default decodeError();
+                default ;//decodeError();
              endcase    
         end
     endtask
