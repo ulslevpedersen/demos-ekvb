@@ -19,6 +19,7 @@ module QueueModule =
         let mutable head = 0
         let data : string[] = Array.zeroCreate cap
         //let data : byte[][] = [| for a in 0 .. cap - 1  do yield [||] |]
+//todo: drop the lock and implement waitfornextperiod        
         let rwlock = new ReaderWriterLock()
 
         // Write if not full
